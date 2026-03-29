@@ -1909,7 +1909,13 @@ function renderTargets() {
     <!-- ② 跨月比較表 -->
     ${buildMonthlyComparison(periods, allGroups, S.targetYear)}
 
-    <!-- ③ 趨勢圖 -->
+    <!-- ③ 全公司總體業績趨勢 -->
+    <div class="card">
+      <div class="card-title" style="margin-bottom:18px">📊 每月總體業績趨勢（${S.targetYear}）</div>
+      <div class="chart-container" style="height:300px"><canvas id="chart-total-perf"></canvas></div>
+    </div>
+
+    <!-- ④ 各組趨勢圖 -->
     <div class="card">
       <div class="card-title" style="margin-bottom:18px">📈 各組月份趨勢（${S.targetYear}）</div>
       <div class="charts-grid">
@@ -1961,7 +1967,73 @@ function buildGroupTrendCharts(periods, allGroups) {
     });
   }
 
-  // 業績趨勢
+  // 全公司總體業績趨勢（柱狀圖 + 目標線）
+  const totalPerfs = months.map(m => {
+    const mp = byMonth[m];
+    return mp ? mp.data.reduce((s,d) => s + d.curr_perf, 0) : 0;
+  });
+  const totalTgts = months.map(m => {
+    const mt = targets[m] || {};
+    const sum = Object.values(mt).reduce((s,v) => s + v, 0);
+    return sum || null;
+  });
+  const ctxTotal = document.getElementById('chart-total-perf');
+  if (ctxTotal) {
+    if (S.charts['chart-total-perf']) { try{ S.charts['chart-total-perf'].destroy(); }catch{} }
+    S.charts['chart-total-perf'] = new Chart(ctxTotal, {
+      type: 'bar',
+      data: {
+        labels: months,
+        datasets: [
+          {
+            label: '實際業績',
+            data: totalPerfs,
+            backgroundColor: totalPerfs.map((v,i) => totalTgts[i] && v >= totalTgts[i] ? '#27ae6099' : '#1a3a5c99'),
+            borderColor: totalPerfs.map((v,i) => totalTgts[i] && v >= totalTgts[i] ? '#27ae60' : '#1a3a5c'),
+            borderWidth: 2,
+            borderRadius: 6
+          },
+          {
+            label: '月目標',
+            data: totalTgts,
+            type: 'line',
+            borderColor: '#e74c3c',
+            backgroundColor: '#e74c3c22',
+            borderWidth: 2.5,
+            borderDash: [6, 4],
+            pointRadius: 5,
+            pointBackgroundColor: '#e74c3c',
+            fill: false,
+            tension: 0,
+            spanGaps: true
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom', labels: { font: { size: 12 }, padding: 14 } },
+          tooltip: {
+            callbacks: {
+              label: ctx => {
+                const v = ctx.raw;
+                if (v == null) return '';
+                return ctx.dataset.label + ': $' + (v >= 10000 ? (v/10000).toFixed(1) + '萬' : v.toLocaleString());
+              }
+            }
+          }
+        },
+        scales: {
+          y: { beginAtZero: true, grid: { color: '#f0f0f0' },
+               ticks: { font: { size: 11 }, callback: v => '$'+(v>=10000?(v/10000).toFixed(0)+'萬':v.toLocaleString()) } },
+          x: { grid: { color: '#f0f0f0' }, ticks: { font: { size: 11 } } }
+        }
+      }
+    });
+  }
+
+  // 各組業績趨勢
   mkLine('chart-grp-perf',
     allGroups.map((g,i) => ({
       label: g,
