@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(*:*)",
+      "Read",
+      "Write",
+      "Edit",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch",
+      "Skill(*:*)",
+      "mcp__Claude_in_Chrome__*",
+      "mcp__Claude_Preview__*",
+      "mcp__mcp-registry__*",
+      "mcp__scheduled-tasks__*",
+      "Bash(python3 notify.py --test)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://127.0.0.1:3000/)",
+      "Bash(npm list:*)",
+      "Bash(npx firebase-tools:*)",
+      "Bash(npm --version)",
+      "Bash(brew install:*)",
+      "Bash(npm install:*)",
+      "Bash(firebase deploy:*)",
+      "Bash(firebase login:*)",
+      "Bash(firebase login:ci --no-localhost)",
+      "Bash(kill 24816)",
+      "Bash(firebase login:list)",
+      "Bash(netlify deploy:*)",
+      "Bash(netlify sites:list)"
+    ],
+    "defaultMode": "bypassPermissions"
+  }
+}

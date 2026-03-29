@@ -1,0 +1,13 @@
+{
+  "hosting": {
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      ".firebase",
+      ".claude",
+      "*.py",
+      "*.csv",
+      "node_modules"
+    ]
+  }
+}

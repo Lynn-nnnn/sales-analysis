@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "tracking-server",
+      "runtimeExecutable": "/bin/sh",
+      "runtimeArgs": ["-c", "/usr/bin/python3 '/Users/chris/Documents/營運業務/業績分析系統/server.py'"],
+      "port": 3000
+    }
+  ]
+}

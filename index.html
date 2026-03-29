@@ -1,0 +1,2733 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>業績分析系統</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <style>
+    :root {
+      --primary: #1a3a5c;
+      --primary-light: #2d5986;
+      --accent: #e74c3c;
+      --success: #27ae60;
+      --warning: #f39c12;
+      --bg: #f0f4f8;
+      --card: #ffffff;
+      --text: #2c3e50;
+      --text-muted: #7f8c8d;
+      --border: #dde3ea;
+      --shadow: 0 2px 12px rgba(0,0,0,0.07);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Microsoft JhengHei', '微軟正黑體', 'PingFang TC', 'Noto Sans TC', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── NAV ── */
+    nav {
+      background: var(--primary);
+      padding: 0 28px;
+      display: flex;
+      align-items: center;
+      height: 58px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.18);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .nav-brand {
+      color: #fff;
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: .5px;
+      margin-right: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .nav-tabs { display: flex; gap: 4px; }
+    .nav-tab {
+      color: rgba(255,255,255,0.65);
+      padding: 8px 18px;
+      cursor: pointer;
+      border-radius: 7px;
+      font-size: 14px;
+      border: none;
+      background: none;
+      font-family: inherit;
+      transition: all .2s;
+    }
+    .nav-tab:hover { background: rgba(255,255,255,0.12); color: #fff; }
+    .nav-tab.active { background: rgba(255,255,255,0.22); color: #fff; font-weight: 600; }
+
+    /* ── LAYOUT ── */
+    main { max-width: 1240px; margin: 0 auto; padding: 28px 18px; }
+    .view-hidden { display: none !important; }
+
+    /* ── CARD ── */
+    .card {
+      background: var(--card);
+      border-radius: 14px;
+      padding: 26px 28px;
+      box-shadow: var(--shadow);
+      margin-bottom: 22px;
+    }
+    .card-title {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 18px;
+      padding-bottom: 14px;
+      border-bottom: 2px solid var(--border);
+    }
+
+    /* ── BUTTONS ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 10px 22px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-family: inherit;
+      font-weight: 600;
+      transition: all .2s;
+      white-space: nowrap;
+    }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-light); }
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-success:hover { background: #1f8a50; }
+    .btn-danger  { background: var(--accent); color: #fff; }
+    .btn-danger:hover { background: #c0392b; }
+    .btn-secondary { background: #eaeff5; color: var(--text); }
+    .btn-secondary:hover { background: #d8e2ec; }
+    .btn-warning { background: var(--warning); color: #fff; }
+    .btn-warning:hover { background: #d68910; }
+    .btn-sm { padding: 6px 14px; font-size: 13px; }
+    .btn:disabled { opacity: .6; cursor: not-allowed; }
+
+    /* ── UPLOAD ── */
+    .upload-zone {
+      border: 2.5px dashed var(--border);
+      border-radius: 14px;
+      padding: 52px 32px;
+      text-align: center;
+      cursor: pointer;
+      transition: all .3s;
+      background: #fafcff;
+    }
+    .upload-zone:hover, .upload-zone.drag-over {
+      border-color: var(--primary);
+      background: rgba(26,58,92,0.04);
+    }
+    .upload-icon { font-size: 52px; line-height: 1; margin-bottom: 14px; }
+    .upload-title { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+    .upload-hint { font-size: 13px; color: var(--text-muted); }
+
+    /* ── FORM ── */
+    .form-group { margin-bottom: 18px; }
+    .form-label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 7px; }
+    .form-control {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1.5px solid var(--border);
+      border-radius: 9px;
+      font-size: 14px;
+      font-family: inherit;
+      background: #fff;
+      transition: border-color .2s;
+    }
+    .form-control:focus { outline: none; border-color: var(--primary); }
+    .form-hint { font-size: 12px; color: var(--text-muted); margin-top: 5px; }
+
+    /* ── BADGE ── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 11px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .badge-danger  { background: #fde8e8; color: #c0392b; }
+    .badge-success { background: #e5f9ef; color: #1f8a50; }
+    .badge-warning { background: #fef5e4; color: #b7770d; }
+    .badge-info    { background: #F0E0CC; color: #6B4C35; }
+    .badge-gray    { background: #f0f0f0; color: #666; }
+
+    /* ── TABLE ── */
+    .tbl-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid var(--border); }
+    .tbl-wrap td, .tbl-wrap th { white-space: nowrap; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th {
+      background: #f4f7fb;
+      padding: 8px 10px;
+      text-align: left;
+      font-weight: 700;
+      font-size: 12px;
+      color: var(--text-muted);
+      border-bottom: 2px solid var(--border);
+      white-space: nowrap;
+    }
+    td {
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(26,58,92,0.025); }
+    .tr-flag td { background: #fff6f6; }
+    .tr-flag:hover td { background: #ffeded; }
+
+    /* ── STATS GRID ── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .stat-card {
+      background: var(--card);
+      border-radius: 11px;
+      padding: 16px 20px;
+      box-shadow: var(--shadow);
+      text-align: center;
+      border-top: 3px solid var(--primary);
+    }
+    .stat-val  { font-size: 26px; font-weight: 700; color: var(--primary); line-height: 1.2; }
+    .stat-lbl  { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+    .stat-card.danger  { border-top-color: var(--accent); }
+    .stat-card.danger .stat-val  { color: var(--accent); }
+    .stat-card.success { border-top-color: var(--success); }
+    .stat-card.success .stat-val { color: var(--success); }
+
+    /* ── ALERT ITEM ── */
+    .alert-list { display: flex; flex-direction: column; gap: 9px; }
+    .alert-item {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      padding: 13px 16px;
+      background: #fff7f7;
+      border-left: 4px solid var(--accent);
+      border-radius: 0 9px 9px 0;
+    }
+    .alert-item.medium { background: #fffcf0; border-left-color: var(--warning); }
+    .alert-icon { font-size: 17px; flex-shrink: 0; line-height: 1; margin-top: 1px; }
+    .alert-title { font-weight: 700; font-size: 14px; }
+    .alert-desc  { font-size: 13px; color: var(--text-muted); margin-top: 2px; line-height: 1.5; }
+
+    /* ── PERSON HEADER ── */
+    .person-header {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      margin-bottom: 22px;
+      flex-wrap: wrap;
+    }
+    .avatar {
+      width: 58px; height: 58px;
+      border-radius: 50%;
+      background: var(--primary);
+      color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px; font-weight: 700;
+      flex-shrink: 0;
+    }
+    .person-name { font-size: 22px; font-weight: 700; }
+    .person-group { font-size: 14px; color: var(--text-muted); margin-top: 2px; }
+
+    /* ── TOPICS EDITOR ── */
+    .topics-editor {
+      width: 100%;
+      min-height: 170px;
+      padding: 13px;
+      border: 1.5px solid var(--border);
+      border-radius: 9px;
+      font-size: 14px;
+      font-family: inherit;
+      line-height: 1.7;
+      resize: vertical;
+      background: #fafcff;
+      transition: border-color .2s;
+    }
+    .topics-editor:focus { outline: none; border-color: var(--primary); }
+
+    /* ── CHARTS ── */
+    .charts-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 22px;
+    }
+    .chart-wrap {
+      background: var(--card);
+      border-radius: 11px;
+      padding: 18px 20px;
+      box-shadow: var(--shadow);
+    }
+    .chart-title { font-size: 13px; font-weight: 700; color: var(--text-muted); margin-bottom: 10px; }
+    .chart-container { position: relative; height: 200px; }
+
+    /* ── FILTER ROW ── */
+    .filter-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 18px;
+    }
+    .filter-row select {
+      padding: 8px 12px;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      font-size: 14px;
+      font-family: inherit;
+      background: #fff;
+      color: var(--text);
+    }
+    .filter-row select:focus { outline: none; border-color: var(--primary); }
+
+    /* ── TREND ── */
+    .trend-up   { color: var(--success); font-weight: 600; font-size: 12px; }
+    .trend-down { color: var(--accent);  font-weight: 600; font-size: 12px; }
+    .trend-flat { color: #aaa; font-size: 12px; }
+
+    /* ── BACK BTN ── */
+    .back-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--primary);
+      background: none;
+      border: none;
+      font-family: inherit;
+      font-size: 14px;
+      cursor: pointer;
+      margin-bottom: 18px;
+      padding: 4px 0;
+      font-weight: 600;
+    }
+    .back-btn:hover { text-decoration: underline; }
+
+    /* ── EMPTY STATE ── */
+    .empty-state {
+      text-align: center;
+      padding: 56px 24px;
+      color: var(--text-muted);
+    }
+    .empty-icon  { font-size: 50px; line-height: 1; margin-bottom: 14px; }
+    .empty-title { font-size: 18px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+
+    /* ── LOADING SPINNER ── */
+    .spinner {
+      display: inline-block;
+      width: 17px; height: 17px;
+      border: 3px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── TOAST ── */
+    #toast {
+      position: fixed;
+      bottom: 26px; right: 26px;
+      background: #2c3e50;
+      color: #fff;
+      padding: 14px 22px;
+      border-radius: 10px;
+      box-shadow: 0 6px 22px rgba(0,0,0,0.22);
+      font-size: 14px;
+      font-weight: 600;
+      transform: translateY(90px);
+      opacity: 0;
+      transition: all .3s cubic-bezier(.4,0,.2,1);
+      z-index: 9999;
+      max-width: 340px;
+      pointer-events: none;
+    }
+    #toast.show { transform: translateY(0); opacity: 1; }
+    #toast.success { background: var(--success); }
+    #toast.error   { background: var(--accent); }
+
+    /* ── API KEY ── */
+    .apikey-row { display: flex; gap: 10px; }
+    .apikey-row .form-control { font-family: monospace; font-size: 13px; letter-spacing: .5px; }
+
+    /* ── RULES LIST ── */
+    .rules-list { margin-left: 20px; }
+    .rules-list li { padding: 5px 0; font-size: 14px; line-height: 1.6; border-bottom: 1px dotted var(--border); }
+    .rules-list li:last-child { border-bottom: none; }
+
+    /* ── PERIOD PILL ── */
+    .period-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255,255,255,0.18);
+      color: #fff;
+      padding: 3px 12px;
+      border-radius: 20px;
+      font-size: 13px;
+      margin-left: 6px;
+    }
+
+    /* ── SECTION HEADER ── */
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .section-header .card-title { margin: 0; border: none; padding: 0; }
+
+    /* Responsive */
+    @media (max-width: 700px) {
+      nav { padding: 0 14px; }
+      .nav-brand { font-size: 14px; }
+      .nav-tab { padding: 6px 10px; font-size: 12px; }
+      main { padding: 16px 12px; }
+      .stats-grid { grid-template-columns: repeat(2,1fr); }
+      .card { padding: 18px 16px; }
+    }
+
+    /* ── 登入畫面 ── */
+    #login-screen {
+      position: fixed; inset: 0;
+      background: linear-gradient(135deg, #1a3a5c 0%, #2d5986 100%);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 9000;
+    }
+    .login-box {
+      background: #fff;
+      border-radius: 18px;
+      padding: 52px 48px;
+      text-align: center;
+      width: 360px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+    }
+    .login-logo { font-size: 52px; margin-bottom: 16px; }
+    .login-title { font-size: 22px; font-weight: 700; color: var(--primary); margin-bottom: 8px; }
+    .login-sub { font-size: 14px; color: var(--text-muted); margin-bottom: 36px; }
+    .btn-google {
+      display: flex; align-items: center; justify-content: center; gap: 12px;
+      width: 100%; padding: 14px;
+      background: #fff; border: 2px solid #e0e0e0; border-radius: 10px;
+      font-size: 15px; font-weight: 600; color: #444;
+      cursor: pointer; font-family: inherit;
+      transition: all .2s;
+    }
+    .btn-google:hover { border-color: #aaa; background: #f9f9f9; }
+    .btn-google img { width: 22px; height: 22px; }
+    .login-error { margin-top: 16px; color: var(--accent); font-size: 13px; }
+    .login-loading { margin-top: 16px; color: var(--text-muted); font-size: 13px; }
+  </style>
+</head>
+<body>
+
+<!-- ====== 登入畫面 ====== -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">📊</div>
+    <div class="login-title">業績分析系統</div>
+    <div class="login-sub">請使用公司 Google 帳號登入</div>
+    <button class="btn-google" onclick="doSignIn()">
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google">
+      使用 Google 帳號登入
+    </button>
+    <div class="login-error" id="login-error" style="display:none"></div>
+    <div class="login-loading" id="login-loading" style="display:none">⏳ 驗證中…</div>
+  </div>
+</div>
+
+<nav>
+  <span class="nav-brand">
+    <span>📊</span>業績分析系統
+    <span class="period-pill" id="nav-period" style="display:none"></span>
+  </span>
+  <div class="nav-tabs">
+    <button class="nav-tab active" id="tab-company"   onclick="showView('company')">📊 全公司總覽</button>
+    <button class="nav-tab"        id="tab-groups"   onclick="showView('groups')">📋 團隊組別</button>
+    <button class="nav-tab"        id="tab-overview" onclick="S.periodId=null; showView('overview')">👤 人員概況</button>
+    <button class="nav-tab"        id="tab-targets"  onclick="showView('targets')">🎯 每月目標</button>
+    <button class="nav-tab"        id="tab-upload"   onclick="showView('upload')">📁 上傳資料</button>
+    <button class="nav-tab"        id="tab-settings" onclick="showView('settings')">⚙️ 設定</button>
+    <span id="nav-user" style="color:rgba(255,255,255,0.7); font-size:13px; margin-left:8px; display:none"></span>
+    <button class="nav-tab" id="tab-logout" onclick="doSignOut()" style="display:none">登出</button>
+  </div>
+</nav>
+
+<main>
+
+  <!-- ====== UPLOAD VIEW ====== -->
+  <div id="view-upload">
+    <div class="card">
+      <div class="card-title">上傳業績 CSV 資料</div>
+      <div class="upload-zone" id="upload-zone"
+           onclick="document.getElementById('file-input').click()"
+           ondragover="onDragOver(event)"
+           ondragleave="onDragLeave(event)"
+           ondrop="onDrop(event)">
+        <div class="upload-icon">📂</div>
+        <div class="upload-title">點擊選擇 CSV 檔案，或直接拖曳至此處</div>
+        <div class="upload-hint">系統會自動從檔名提取日期（如 2026-03-17），支援每日上傳追蹤變化</div>
+      </div>
+      <input type="file" id="file-input" accept=".csv" style="display:none" onchange="onFileSelect(event)">
+
+      <div id="upload-form" style="display:none; margin-top:22px">
+        <div style="background:#f4f7fb; border-radius:10px; padding:14px 18px; margin-bottom:18px; font-size:14px; display:flex; align-items:center; gap:10px">
+          <span style="font-size:20px">📄</span>
+          <span id="file-preview-name"></span>
+          <span id="file-preview-size" style="color:#999; margin-left:4px"></span>
+        </div>
+        <div class="form-group">
+          <label class="form-label">期別名稱</label>
+          <input type="text" class="form-control" id="period-input" placeholder="例如：2026-03-17" style="max-width:280px">
+          <div class="form-hint">此名稱將作為該期資料的識別標籤</div>
+        </div>
+        <div style="display:flex; gap:10px">
+          <button class="btn btn-primary" onclick="doUpload()">✓ 匯入資料</button>
+          <button class="btn btn-secondary" onclick="cancelUpload()">取消</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 直播類上傳 -->
+    <div class="card">
+      <div class="card-title">📺 上傳直播類業績（XPlatform）</div>
+      <div class="upload-zone" id="livestream-upload-zone"
+           onclick="document.getElementById('livestream-file-input').click()"
+           ondragover="onDragOver(event)"
+           ondragleave="onDragLeave(event)"
+           ondrop="onLivestreamDrop(event)">
+        <div class="upload-icon">📺</div>
+        <div class="upload-title">點擊選擇直播類 CSV，或直接拖曳至此處</div>
+        <div class="upload-hint">從 Metabase「銷售總額_XPlatform」下載的 CSV（含月份與金額）</div>
+      </div>
+      <input type="file" id="livestream-file-input" accept=".csv" style="display:none" onchange="onLivestreamFileSelect(event)">
+      <div id="livestream-result" style="margin-top:12px"></div>
+      <div id="livestream-history" style="margin-top:12px"></div>
+    </div>
+
+    <!-- 歷史資料匯入說明 -->
+    <div class="card" style="border-left:4px solid var(--primary)">
+      <div class="card-title" style="margin-bottom:10px">📥 如何匯入歷史資料（去年度 / 舊月份）</div>
+      <p style="font-size:14px; color:var(--text-muted); line-height:1.8; margin:0">
+        本系統支援匯入任何月份的歷史 CSV，只需：<br>
+        <strong>① 準備該月的業績 CSV</strong>（欄位格式與平常一致，用「本期」欄位存放該月數據）<br>
+        <strong>② 拖曳上傳</strong>→ 在「期別日期」填入歷史日期，例如 <code>2025-01-31</code>（代表 2025 年 1 月）<br>
+        <strong>③ 逐月重複上傳</strong>，系統會自動依日期分月，並在「每月目標」頁面的年份切換中顯示<br><br>
+        💡 <strong>每月上傳一個 CSV</strong>，同一個月若重複上傳會以最新一筆為準。
+      </p>
+    </div>
+
+    <!-- 月份目標設定 -->
+    <div id="targets-input-content"></div>
+
+    <div class="card">
+      <div class="card-title">已上傳期別記錄</div>
+      <div id="history-list"></div>
+    </div>
+  </div>
+
+  <!-- ====== OVERVIEW VIEW ====== -->
+  <div id="view-overview" class="view-hidden">
+    <div id="overview-content"></div>
+  </div>
+
+  <!-- ====== COMPANY VIEW ====== -->
+  <div id="view-company" class="view-hidden">
+    <div id="company-content"></div>
+  </div>
+
+  <!-- ====== GROUPS VIEW ====== -->
+  <div id="view-groups" class="view-hidden">
+    <div id="groups-content"></div>
+  </div>
+
+  <!-- ====== TARGETS VIEW ====== -->
+  <div id="view-targets" class="view-hidden">
+    <div id="targets-content"></div>
+  </div>
+
+  <!-- ====== DETAIL VIEW ====== -->
+  <div id="view-detail" class="view-hidden">
+    <div id="detail-content"></div>
+  </div>
+
+  <!-- ====== SETTINGS VIEW ====== -->
+  <div id="view-settings" class="view-hidden">
+    <div class="card">
+      <div class="card-title">🔑 Claude API 設定</div>
+      <div class="form-group">
+        <label class="form-label">API Key</label>
+        <div class="apikey-row">
+          <input type="password" class="form-control" id="api-key-input" placeholder="sk-ant-api03-...">
+          <button class="btn btn-secondary btn-sm" onclick="toggleApiVis()">👁 顯示</button>
+        </div>
+        <div class="form-hint">
+          API Key 僅儲存於本機瀏覽器 localStorage，不會傳送至任何第三方伺服器。<br>
+          請至 <strong>console.anthropic.com</strong> 取得您的 API Key。
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="saveApiKey()">💾 儲存 API Key</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🗑️ 資料管理</div>
+      <p style="font-size:14px; color:var(--text-muted); margin-bottom:18px">
+        所有業績資料及討論議題均儲存於瀏覽器的 localStorage，關閉瀏覽器後仍會保留。
+      </p>
+      <button class="btn btn-danger" onclick="clearData()">🗑️ 清除所有業績資料</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">⚙️ 警示規則調整</div>
+      <p style="font-size:13px; color:var(--text-muted); margin-bottom:18px">
+        調整後點「套用並重算」，所有已上傳的期別資料會立即重新計算，畫面即時更新。
+      </p>
+      <div id="rules-form"></div>
+      <div style="display:flex; gap:10px; margin-top:18px; align-items:center; flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="saveRules()">✅ 套用並重算</button>
+        <button class="btn btn-secondary" onclick="resetRules()">↩ 恢復預設值</button>
+        <span id="rules-saved-note" style="font-size:13px; color:var(--success); display:none">✓ 已套用，所有期別資料已重新計算</span>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<div id="toast"></div>
+
+<script>
+/* ═══════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════ */
+const S = {
+  view: 'groups',
+  periodId: null,
+  personKey: null,
+  personIdx: null,
+  pendingFile: null,
+  charts: {},
+  filterGroup: '',
+  filterStatus: '',
+  filterName: '',
+  sortBy: 'group',
+  targetMonth: null,
+  targetYear: null,
+  groupMonth: null
+};
+
+/* ═══════════════════════════════════════════
+   STORAGE
+═══════════════════════════════════════════ */
+/* ── Firebase 初始化 ── */
+let _auth;
+const _fbCfg = {
+  apiKey: "AIzaSyBq3p37Lise1NV196Y73f_VStaywQbDrRo",
+  authDomain: "sale-analysis-2026-03-17.firebaseapp.com",
+  projectId: "sale-analysis-2026-03-17",
+  storageBucket: "sale-analysis-2026-03-17.firebasestorage.app",
+  messagingSenderId: "460203397370",
+  appId: "1:460203397370:web:f85e6ac8ce9c1bec13b943"
+};
+firebase.initializeApp(_fbCfg);
+const _fs   = firebase.firestore();
+_auth = firebase.auth();
+
+/* ── Firestore 同步（fire-and-forget，不影響 UI 速度） ── */
+function fsyncPeriods(arr) {
+  const batch = _fs.batch();
+  arr.forEach(p => batch.set(_fs.collection('periods').doc(p.id), p));
+  batch.commit().catch(e => console.warn('Firestore write failed:', e.message));
+}
+function fsyncTopics(obj) {
+  _fs.collection('shared').doc('topics').set(obj)
+    .catch(e => console.warn('Firestore topics write failed:', e.message));
+}
+function fsyncTargets(obj) {
+  _fs.collection('shared').doc('targets').set(obj)
+    .catch(e => console.warn('Firestore targets write failed:', e.message));
+}
+function fsyncRules(obj) {
+  _fs.collection('shared').doc('rules').set(obj)
+    .catch(e => console.warn('Firestore rules write failed:', e.message));
+}
+function fsyncLivestream(obj) {
+  _fs.collection('shared').doc('livestream').set(obj)
+    .catch(e => console.warn('Firestore livestream write failed:', e.message));
+}
+async function loadFromFirestore() {
+  try {
+    const [pSnap, tSnap, trSnap, rlSnap, lsSnap] = await Promise.all([
+      _fs.collection('periods').get(),
+      _fs.collection('shared').doc('topics').get(),
+      _fs.collection('shared').doc('targets').get(),
+      _fs.collection('shared').doc('rules').get(),
+      _fs.collection('shared').doc('livestream').get()
+    ]);
+    if (!pSnap.empty) {
+      const periods = pSnap.docs.map(d => d.data());
+      localStorage.setItem('sp_periods', JSON.stringify(periods));
+    }
+    if (tSnap.exists)  localStorage.setItem('sp_topics',  JSON.stringify(tSnap.data()));
+    if (trSnap.exists) localStorage.setItem('sp_targets', JSON.stringify(trSnap.data()));
+    if (rlSnap.exists) localStorage.setItem('sp_rules',   JSON.stringify(rlSnap.data()));
+    if (lsSnap.exists) localStorage.setItem('sp_livestream', JSON.stringify(lsSnap.data()));
+  } catch(e) {
+    console.warn('Firestore load failed, using local cache:', e.message);
+  }
+}
+
+/* ── 本地資料存取（localStorage 作為快取） ── */
+const DB = {
+  periods()   { try { return JSON.parse(localStorage.getItem('sp_periods') || '[]'); } catch{ return []; } },
+  save(arr)   { localStorage.setItem('sp_periods', JSON.stringify(arr)); fsyncPeriods(arr); },
+  apiKey()    { return localStorage.getItem('sp_apikey') || ''; },
+  setApi(k)   { localStorage.setItem('sp_apikey', k); },
+  topics()    { try { return JSON.parse(localStorage.getItem('sp_topics') || '{}'); } catch{ return {}; } },
+  setTopics(o){ localStorage.setItem('sp_topics', JSON.stringify(o)); fsyncTopics(o); },
+  targets()    { try { return JSON.parse(localStorage.getItem('sp_targets') || '{}'); } catch{ return {}; } },
+  setTargets(o){ localStorage.setItem('sp_targets', JSON.stringify(o)); fsyncTargets(o); },
+  rules()      {
+    const def = { r1:50, r3:35, r4:35, r5:35, r6:50, r7:40, r8:300000, r9inv:2, r9att:40, callsMin:5 };
+    try { return Object.assign({}, def, JSON.parse(localStorage.getItem('sp_rules') || '{}')); }
+    catch { return def; }
+  },
+  setRules(o)  { localStorage.setItem('sp_rules', JSON.stringify(o)); fsyncRules(o); },
+  livestream()    { try { return JSON.parse(localStorage.getItem('sp_livestream') || '{}'); } catch{ return {}; } },
+  setLivestream(o){ localStorage.setItem('sp_livestream', JSON.stringify(o)); fsyncLivestream(o); }
+};
+
+/* ═══════════════════════════════════════════
+   CSV PARSER
+═══════════════════════════════════════════ */
+function parseLine(line) {
+  const out = [];
+  let cur = '', q = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') {
+      if (q && line[i+1] === '"') { cur += '"'; i++; }
+      else q = !q;
+    } else if (c === ',' && !q) { out.push(cur.trim()); cur = ''; }
+    else cur += c;
+  }
+  out.push(cur.trim());
+  return out;
+}
+
+function parseCSV(text) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  if (lines.length < 2) return [];
+  const headers = parseLine(lines[0]);
+  return lines.slice(1)
+    .filter(l => l.trim())
+    .map(l => {
+      const vals = parseLine(l);
+      const row = {};
+      headers.forEach((h, i) => { row[h] = vals[i] || ''; });
+      return row;
+    });
+}
+
+function num(v) {
+  if (!v || v === '-' || v === 'N/A' || v === '#DIV/0!' || v === '#VALUE!') return 0;
+  return parseFloat(String(v).replace(/[,\s%$]/g, '')) || 0;
+}
+
+/* ═══════════════════════════════════════════
+   DATA MAPPING
+═══════════════════════════════════════════ */
+function mapRow(r) {
+  return {
+    app_id:           r['app_id'] || r['APP_ID'] || '',
+    group:            r['組別'] || '',
+    name:             r['姓名'] || '',
+    curr_perf:        num(r['本期業績']),
+    prev_perf:        num(r['上期業績']),
+    curr_calls:       num(r['本期通次']),
+    prev_calls:       num(r['上期通次']),
+    curr_invites:     num(r['本期邀約數']),
+    prev_invites:     num(r['上期邀約數']),
+    curr_attend:      num(r['本期出席數']),
+    prev_attend:      num(r['上期出席數']),
+    curr_inv_rate:    num(r['本期邀約率(件數版%)'] || r['本期邀約率']),
+    prev_inv_rate:    num(r['上期邀約率(件數版%)'] || r['上期邀約率']),
+    curr_att_rate:    num(r['本期出席率(件數版%)'] || r['本期出席率']),
+    prev_att_rate:    num(r['上期出席率(件數版%)'] || r['上期出席率']),
+    curr_conv:        num(r['本期進件成交率(%)'] || r['本期進件成交率']),
+    prev_conv:        num(r['上期進件成交率(%)'] || r['上期進件成交率']),
+    curr_ref_cnt:     num(r['本期退費件數']),
+    prev_ref_cnt:     num(r['上期退費件數']),
+    curr_ref_amt:     num(r['本期退費金額']),
+    prev_ref_amt:     num(r['上期退費金額'])
+  };
+}
+
+function teamStats(people) {
+  const perfs  = people.map(p => p.curr_perf).filter(v => v > 0);
+  const calls  = people.map(p => p.curr_calls).filter(v => v > 0);
+  return {
+    avgPerf:  perfs.length  ? perfs.reduce((a,b)=>a+b,0)/perfs.length  : 0,
+    avgCalls: calls.length  ? calls.reduce((a,b)=>a+b,0)/calls.length : 0
+  };
+}
+
+/* ═══════════════════════════════════════════
+   ALERT ENGINE (8 rules)
+═══════════════════════════════════════════ */
+function analyse(p, stats) {
+  const A = [];
+  const R = DB.rules(); // 從設定讀取動態門檻
+  const { curr_perf:cp, prev_perf:pp, curr_calls:cc, prev_calls:pc,
+          curr_inv_rate:cir, prev_inv_rate:pir, curr_att_rate:car, prev_att_rate:par,
+          curr_conv:ccv, prev_conv:pcv, curr_ref_amt:cra, prev_ref_amt:pra } = p;
+  const { avgPerf, avgCalls, dayRatio = 1, uploadDay = 0, totalDays = 0 } = stats;
+
+  const projPerf = (dayRatio > 0 && dayRatio < 1 && cp > 0) ? cp / dayRatio : cp;
+
+  // R1: 業績下滑超過 R.r1%
+  if (pp > 0 && cp < pp * (1 - R.r1/100)) {
+    const d = Math.round((pp - cp) / pp * 100);
+    A.push({ id:'r1', sev:'high', title:'業績大幅下滑',
+      desc:`本期業績 ${$$(cp)} 較上期 ${$$(pp)} 下滑 ${d}%（門檻 ${R.r1}%）` });
+  }
+  // R2: 連續業績為零
+  if (cp === 0 && pp === 0) {
+    A.push({ id:'r2', sev:'high', title:'連續業績為零',
+      desc:'本期與上期業績均為零，需關注業務活動狀況' });
+  }
+  // R3: 邀約率下降超過 R.r3 百分點
+  if (pir > 0 && cir < pir - R.r3) {
+    A.push({ id:'r3', sev:'medium', title:'邀約率大幅下降',
+      desc:`邀約率 ${cir.toFixed(1)}% → 上期 ${pir.toFixed(1)}%，下降 ${(pir-cir).toFixed(1)}%（門檻 ${R.r3}%）` });
+  }
+  // R4: 出席率下降超過 R.r4 百分點
+  if (par > 0 && car < par - R.r4) {
+    A.push({ id:'r4', sev:'medium', title:'出席率大幅下降',
+      desc:`出席率 ${car.toFixed(1)}% → 上期 ${par.toFixed(1)}%，下降 ${(par-car).toFixed(1)}%（門檻 ${R.r4}%）` });
+  }
+  // R5: 成交率下降超過 R.r5 百分點
+  if (pcv > 0 && ccv < pcv - R.r5) {
+    A.push({ id:'r5', sev:'medium', title:'進件成交率明顯下降',
+      desc:`成交率 ${ccv.toFixed(1)}% → 上期 ${pcv.toFixed(1)}%，下降 ${(pcv-ccv).toFixed(1)}%（門檻 ${R.r5}%）` });
+  }
+  // R6: 退費增加超過 R.r6%
+  if (pra > 0 && cra > pra * (1 + R.r6/100)) {
+    const d = Math.round((cra - pra) / pra * 100);
+    A.push({ id:'r6', sev:'high', title:'退費金額大幅增加',
+      desc:`退費 ${$$(cra)} 較上期 ${$$(pra)} 增加 ${d}%（門檻 ${R.r6}%）` });
+  }
+  // R7: 業績低於全體均值的 R.r7%
+  if (avgPerf > 0 && cp > 0 && cp < avgPerf * (R.r7/100)) {
+    A.push({ id:'r7', sev:'high', title:'業績嚴重低於團隊水準',
+      desc:`業績 ${$$(cp)} 低於全體均值 ${$$(avgPerf)} 的 ${R.r7}%` });
+  }
+  // R8: 預估整月業績低於 R.r8
+  if (cp > 0 && projPerf < R.r8) {
+    const target = $$(R.r8);
+    if (dayRatio < 1 && totalDays > 0) {
+      const warn = dayRatio < 0.15 ? '⚠ 月份尚早，推估僅供參考' : '';
+      A.push({ id:'r8', sev:'medium', title:`預估整月業績未達 ${target}`,
+        desc:`當前業績 ${$$(cp)}（本月第 ${uploadDay} 天，進度 ${Math.round(dayRatio*100)}%），` +
+             `按此進度推估整月約 ${$$(Math.round(projPerf))}，低於目標 ${target}。${warn}` });
+    } else {
+      A.push({ id:'r8', sev:'medium', title:`整月業績未達 ${target}`,
+        desc:`本期業績 ${$$(cp)}，低於目標 ${target}` });
+    }
+  }
+  // R9: 邀約率 < R.r9inv% 且出席率 < R.r9att%
+  if (cir > 0 && cir < R.r9inv && car > 0 && car < R.r9att) {
+    A.push({ id:'r9', sev:'medium', title:'邀約率與出席率雙低',
+      desc:`邀約率 ${cir.toFixed(2)}%（門檻 ${R.r9inv}%）且出席率 ${car.toFixed(1)}%（門檻 ${R.r9att}%）同時偏低` });
+  }
+  return A;
+}
+
+/* ═══════════════════════════════════════════
+   FORMATTERS
+═══════════════════════════════════════════ */
+function $$(v) {
+  if (!v && v !== 0) return '$0';
+  return '$' + Math.round(v).toLocaleString('zh-TW');
+}
+function pct(v)  { return v.toFixed(1) + '%'; }
+function personKey(p) { return p.app_id || p.name; }
+
+function groupBadge(g) {
+  let bg, color;
+  if (g.includes('財經'))      { bg = '#FFF0B3'; color = '#7A5C00'; }
+  else if (g.includes('實體')) { bg = '#DBEAFE'; color = '#1E40AF'; } // 藍色
+  else                         { bg = '#D6EFD8'; color = '#1E5C2A'; } // 綠色
+  return `<span style="display:inline-flex;align-items:center;padding:3px 11px;border-radius:20px;font-size:12px;font-weight:700;background:${bg};color:${color}">${g}</span>`;
+}
+
+// 分類函式：回傳 '財經' / '實體' / '職能'
+function groupCat(g) {
+  if (!g) return '職能';
+  if (g.includes('財經')) return '財經';
+  if (g.includes('實體')) return '實體';
+  return '職能';
+}
+// 分類排序權重
+function catOrder(g) {
+  const c = groupCat(g);
+  return c === '職能' ? 0 : c === '財經' ? 1 : 2; // 職能→財經→實體
+}
+
+function trendBadge(curr, prev) {
+  if (!prev || prev === 0) return '';
+  const d = (curr - prev) / prev * 100;
+  if (d >  3) return `<span class="trend-up">▲ ${Math.abs(d).toFixed(1)}%</span>`;
+  if (d < -3) return `<span class="trend-down">▼ ${Math.abs(d).toFixed(1)}%</span>`;
+  return `<span class="trend-flat">— ${d.toFixed(1)}%</span>`;
+}
+
+/* ═══════════════════════════════════════════
+   VIEW ROUTING
+═══════════════════════════════════════════ */
+function showView(v) {
+  ['upload','overview','company','groups','targets','detail','settings'].forEach(id => {
+    document.getElementById('view-'+id).classList.add('view-hidden');
+    const t = document.getElementById('tab-'+id);
+    if (t) t.classList.remove('active');
+  });
+  document.getElementById('view-'+v).classList.remove('view-hidden');
+  const t = document.getElementById('tab-'+v);
+  if (t) t.classList.add('active');
+  S.view = v;
+
+  // Destroy charts when leaving detail
+  if (v !== 'detail') destroyCharts();
+
+  if (v === 'overview') renderOverview();
+  if (v === 'company')  renderCompany();
+  if (v === 'groups')   renderGroups();
+  if (v === 'targets')  renderTargets();
+  if (v === 'upload')   renderHistory();
+  if (v === 'settings') renderSettings();
+}
+
+/* ═══════════════════════════════════════════
+   UPLOAD HANDLERS
+═══════════════════════════════════════════ */
+function onDragOver(e) {
+  e.preventDefault();
+  document.getElementById('upload-zone').classList.add('drag-over');
+}
+function onDragLeave() {
+  document.getElementById('upload-zone').classList.remove('drag-over');
+}
+function onDrop(e) {
+  e.preventDefault();
+  document.getElementById('upload-zone').classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if (f && f.name.toLowerCase().endsWith('.csv')) startFileLoad(f);
+  else toast('請上傳 .csv 格式的檔案', 'error');
+}
+function onFileSelect(e) {
+  const f = e.target.files[0];
+  if (f) startFileLoad(f);
+}
+function startFileLoad(f) {
+  S.pendingFile = f;
+  // 優先抓完整日期 YYYY-MM-DD，其次退而求其次抓 YYYY-MM
+  const m = f.name.match(/(\d{4}-\d{2}-\d{2})/) || f.name.match(/(\d{4}-\d{2})/);
+  document.getElementById('period-input').value = m ? m[1] : '';
+  document.getElementById('file-preview-name').textContent = f.name;
+  document.getElementById('file-preview-size').textContent = `(${(f.size/1024).toFixed(1)} KB)`;
+  document.getElementById('upload-form').style.display = 'block';
+}
+function cancelUpload() {
+  S.pendingFile = null;
+  document.getElementById('upload-form').style.display = 'none';
+  document.getElementById('file-input').value = '';
+}
+
+/* ── 直播類上傳 ── */
+const _zhMonths = {'一月':'01','二月':'02','三月':'03','四月':'04','五月':'05','六月':'06','七月':'07','八月':'08','九月':'09','十月':'10','十一月':'11','十二月':'12'};
+function onLivestreamDrop(e) {
+  e.preventDefault();
+  const f = e.dataTransfer.files[0];
+  if (f && f.name.toLowerCase().endsWith('.csv')) processLivestreamFile(f);
+  else toast('請上傳 .csv 格式的檔案', 'error');
+}
+function onLivestreamFileSelect(e) {
+  const f = e.target.files[0];
+  if (f) processLivestreamFile(f);
+  e.target.value = '';
+}
+async function processLivestreamFile(f) {
+  const text = await f.text();
+  const raw = parseCSV(text);
+  if (!raw.length) { toast('CSV 無有效資料', 'error'); return; }
+  const data = DB.livestream();
+  let count = 0;
+  raw.forEach(r => {
+    // 解析月份：「三月 2026」→ 2026-03
+    const monthCol = r['Created At: Month'] || r['Created At'] || '';
+    const priceCol = r['Payment Log → Price 的總和'] || r['Payment Log → Price'] || '';
+    const m = monthCol.match(/^(.+?)\s+(\d{4})$/);
+    if (!m) return;
+    const mm = _zhMonths[m[1]];
+    if (!mm) return;
+    const key = `${m[2]}-${mm}`;
+    const val = parseFloat(String(priceCol).replace(/,/g, '')) || 0;
+    if (val > 0) { data[key] = val; count++; }
+  });
+  if (!count) { toast('找不到有效的直播類資料，請確認 CSV 格式', 'error'); return; }
+  DB.setLivestream(data);
+  toast(`已匯入 ${count} 筆直播類業績`, 'success');
+  renderLivestreamHistory();
+}
+function renderLivestreamHistory() {
+  const data = DB.livestream();
+  const el = document.getElementById('livestream-history');
+  if (!el) return;
+  const keys = Object.keys(data).sort((a,b) => b.localeCompare(a));
+  if (!keys.length) { el.innerHTML = ''; return; }
+  el.innerHTML = `<div style="font-size:13px; color:var(--text-muted); margin-bottom:8px">已匯入的直播類業績：</div>
+    <table style="width:100%; font-size:14px"><thead><tr><th style="text-align:left">月份</th><th style="text-align:right">業績</th><th></th></tr></thead><tbody>
+    ${keys.map(k => `<tr><td>${k}</td><td style="text-align:right; font-weight:600">$${data[k].toLocaleString()}</td>
+      <td style="text-align:right"><button class="btn btn-secondary btn-sm" onclick="deleteLivestreamMonth('${k}')" style="padding:2px 8px; font-size:11px">刪除</button></td></tr>`).join('')}
+    </tbody></table>`;
+}
+function deleteLivestreamMonth(key) {
+  const data = DB.livestream();
+  delete data[key];
+  DB.setLivestream(data);
+  renderLivestreamHistory();
+  toast(`已刪除 ${key} 直播類資料`);
+}
+
+async function doUpload() {
+  if (!S.pendingFile) return;
+  const pname = document.getElementById('period-input').value.trim();
+  if (!pname) { toast('請輸入期別名稱', 'error'); return; }
+
+  const text = await S.pendingFile.text();
+  const raw  = parseCSV(text);
+  if (!raw.length) { toast('CSV 無有效資料', 'error'); return; }
+
+  const allPeople = raw.map(mapRow).filter(p => p.name.trim());
+  if (!allPeople.length) { toast('找不到有效的人員資料，請確認欄位名稱', 'error'); return; }
+
+  // 剔除通次低於門檻的人員（可能非業務角色）
+  const people = allPeople.filter(p => p.curr_calls >= DB.rules().callsMin);
+  const skipped = allPeople.length - people.length;
+  if (!people.length) { toast('篩除通次 < 5 後無剩餘資料', 'error'); return; }
+
+  // ── 計算本月進度（runway）──
+  // 優先從期別名稱本身解析日期（YYYY-MM-DD），這樣每天上傳都能正確推算
+  const now = new Date();
+  let dayRatio = 1, uploadDay = 0, totalDays = 0;
+  const dMatch = pname.match(/^(\d{4})-(\d{2})-(\d{2})$/);       // 每日格式
+  const mMatch = !dMatch && pname.match(/^(\d{4})-(\d{2})$/);    // 月份格式（備用）
+  if (dMatch) {
+    const [, yr, mo, dy] = dMatch;
+    totalDays = new Date(+yr, +mo, 0).getDate();  // 本月總天數
+    uploadDay = +dy;
+    dayRatio  = Math.min(uploadDay / totalDays, 1);
+  } else if (mMatch) {
+    // 舊格式 YYYY-MM：用今天的日期推算（保持向下相容）
+    totalDays = new Date(+mMatch[1], +mMatch[2], 0).getDate();
+    uploadDay = now.getDate();
+    dayRatio  = Math.min(uploadDay / totalDays, 1);
+  }
+
+  const stats = teamStats(people);
+  stats.dayRatio  = dayRatio;
+  stats.uploadDay = uploadDay;
+  stats.totalDays = totalDays;
+
+  const data  = people.map(p => {
+    const alerts = analyse(p, stats);
+    return { ...p, alerts, needsDiscussion: alerts.length > 0 };
+  });
+
+  const period = {
+    id: pname, name: pname,
+    uploadDate: now.toLocaleDateString('zh-TW'),
+    data, stats
+  };
+
+  const periods = DB.periods();
+  const idx = periods.findIndex(p => p.id === pname);
+  const skipNote = skipped > 0 ? `（已剔除通次 < 5 共 ${skipped} 人）` : '';
+  if (idx >= 0) { periods[idx] = period; toast(`已更新「${pname}」期別資料 ${skipNote}`, 'success'); }
+  else          { periods.push(period);  toast(`成功匯入「${pname}」共 ${people.length} 人 ${skipNote}`, 'success'); }
+  DB.save(periods);
+
+  S.periodId = pname;
+  updateNavPeriod();
+  cancelUpload();
+  renderHistory();
+}
+
+function updateNavPeriod() {
+  const el = document.getElementById('nav-period');
+  if (S.periodId) { el.textContent = S.periodId; el.style.display = ''; }
+  else             el.style.display = 'none';
+}
+
+/* ═══════════════════════════════════════════
+   HISTORY
+═══════════════════════════════════════════ */
+function renderHistory() {
+  renderTargetsInput();
+  renderLivestreamHistory();
+  const periods = DB.periods().sort((a,b) => b.id.localeCompare(a.id));
+  const el = document.getElementById('history-list');
+  if (!periods.length) {
+    el.innerHTML = `<div class="empty-state">
+      <div class="empty-icon">📂</div>
+      <div class="empty-title">尚未上傳任何資料</div>
+      <div>請點擊上方區域上傳業績 CSV 檔案</div>
+    </div>`; return;
+  }
+  el.innerHTML = `
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th>期別</th><th>總人數</th><th>需要談談</th><th>平均業績</th><th>上傳日期</th><th>操作</th>
+        </tr></thead>
+        <tbody>${periods.map(p => {
+          const flagCnt = p.data.filter(d => d.needsDiscussion).length;
+          return `<tr>
+            <td><strong>${p.name}</strong></td>
+            <td>${p.data.length} 人</td>
+            <td>${flagCnt > 0
+              ? `<span class="badge badge-danger">⚠ ${flagCnt} 人</span>`
+              : `<span class="badge badge-success">✓ 無</span>`}
+            </td>
+            <td>${$$(p.stats.avgPerf)}</td>
+            <td>${p.uploadDate}</td>
+            <td>
+              <button class="btn btn-primary btn-sm" onclick="gotoOverview('${p.id}')">查看總覽</button>
+              <button class="btn btn-secondary btn-sm" style="margin-left:6px" onclick="deletePeriod('${p.id}')">刪除</button>
+            </td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>
+    </div>`;
+}
+
+function gotoOverview(id) {
+  S.periodId = id;
+  updateNavPeriod();
+  showView('overview');
+}
+
+function deletePeriod(id) {
+  if (!confirm(`確定要刪除「${id}」期別的所有資料嗎？`)) return;
+  DB.save(DB.periods().filter(p => p.id !== id));
+  _fs.collection('periods').doc(id).delete().catch(() => {});
+  if (S.periodId === id) { S.periodId = null; updateNavPeriod(); }
+  renderHistory();
+  toast('已刪除', 'success');
+}
+
+/* ═══════════════════════════════════════════
+   OVERVIEW
+═══════════════════════════════════════════ */
+function renderOverview() {
+  const periods = DB.periods().sort((a,b) => b.id.localeCompare(a.id));
+  const el = document.getElementById('overview-content');
+
+  if (!periods.length) {
+    el.innerHTML = `<div class="empty-state">
+      <div class="empty-icon">📊</div>
+      <div class="empty-title">尚無資料</div>
+      <div>請先至「上傳資料」頁面匯入業績 CSV</div>
+    </div>`; return;
+  }
+
+  // 永遠預設顯示最新期別（日期最靠近今天）
+  if (!S.periodId || !periods.find(p => p.id === S.periodId))
+    S.periodId = periods[0].id;
+  // 若 periodId 存在但不是最新，仍尊重用戶選擇（由 period picker 控制）
+
+  const period = periods.find(p => p.id === S.periodId);
+  const groups = [...new Set(period.data.map(p => p.group))].filter(g=>g).sort();
+  const allNames = [...new Set(period.data.map(p => p.name))].filter(n=>n).sort();
+  const flagged = period.data.filter(p => p.needsDiscussion);
+
+  // ── 月份進度資訊 ──
+  const { dayRatio = 1, uploadDay = 0, totalDays = 0 } = period.stats;
+  const hasRunway = dayRatio < 1 && totalDays > 0;
+  const progressPct = Math.round(dayRatio * 100);
+  const runwayHtml = hasRunway ? `
+    <div style="background:#fffbe6; border:1px solid #ffe082; border-radius:10px; padding:12px 18px; margin-bottom:18px; font-size:14px; display:flex; align-items:center; gap:14px; flex-wrap:wrap">
+      <span style="font-size:22px">📅</span>
+      <div>
+        <strong>資料日期：${S.periodId}</strong>（本月第 ${uploadDay} 天，共 ${totalDays} 天，進度 ${progressPct}%）
+        <div style="margin-top:4px">
+          <div style="background:#e0e0e0; border-radius:20px; height:8px; width:220px; display:inline-block; vertical-align:middle">
+            <div style="background:${progressPct < 30 ? '#f39c12' : '#27ae60'}; width:${progressPct}%; height:100%; border-radius:20px"></div>
+          </div>
+          <span style="color:#888; font-size:12px; margin-left:8px">「預估整月業績」以此進度推算</span>
+        </div>
+      </div>
+    </div>` : '';
+
+  el.innerHTML = `
+    ${runwayHtml}
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-val" id="sc-total">${period.data.length}</div><div class="stat-lbl">總人數</div></div>
+      <div class="stat-card danger"><div class="stat-val" id="sc-flag">${flagged.length}</div><div class="stat-lbl">需要談談</div></div>
+      <div class="stat-card success"><div class="stat-val" id="sc-ok">${period.data.length - flagged.length}</div><div class="stat-lbl">表現正常</div></div>
+      <div class="stat-card"><div class="stat-val" style="font-size:18px" id="sc-sum-perf">${$$(period.data.reduce((s,p)=>s+p.curr_perf,0))}</div><div class="stat-lbl">業績加總（當前）</div></div>
+      <div class="stat-card"><div class="stat-val" style="font-size:20px" id="sc-avg-perf">${$$(period.stats.avgPerf)}</div><div class="stat-lbl">平均業績（當前）</div></div>
+      <div class="stat-card"><div class="stat-val" id="sc-proj-perf">${hasRunway ? $$(Math.round(period.stats.avgPerf / dayRatio)) : '-'}</div><div class="stat-lbl">平均業績（推估整月）</div></div>
+      <div class="stat-card"><div class="stat-val" id="sc-avg-calls">${Math.round(period.stats.avgCalls)}</div><div class="stat-lbl">平均通次</div></div>
+    </div>
+
+    <div class="card">
+      <div class="section-header">
+        <div class="card-title">${period.name} 業務人員概況</div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center">
+          <select id="sel-period" onchange="changePeriod(this.value)">
+            ${periods.map(p => `<option value="${p.id}" ${p.id===S.periodId?'selected':''}>${p.name}</option>`).join('')}
+          </select>
+          <select id="sel-group" onchange="refilter()">
+            <option value="">全部組別</option>
+            ${groups.map(g => `<option value="${g}" ${S.filterGroup===g?'selected':''}>${g}</option>`).join('')}
+          </select>
+          <select id="sel-status" onchange="refilter()">
+            <option value="" ${S.filterStatus===''?'selected':''}>全部狀態</option>
+            <option value="flag" ${S.filterStatus==='flag'?'selected':''}>需要談談</option>
+            <option value="ok" ${S.filterStatus==='ok'?'selected':''}>表現正常</option>
+          </select>
+          <input id="sel-name" type="text" list="name-list" placeholder="搜尋姓名…" value="${S.filterName}" oninput="S.filterName=this.value.trim(); refilter()" style="padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;font-family:inherit;width:110px">
+          <datalist id="name-list">${allNames.map(n=>`<option value="${n}">`).join('')}</datalist>
+          ${S.sortBy !== 'group' ? `<button class="btn btn-warning btn-sm" onclick="S.sortBy='group'; refilter()" style="color:#fff">✕ 取消排序</button>` : ''}
+          <button class="btn btn-secondary btn-sm" onclick="exportExcel()">📥 匯出 Excel</button>
+          <button class="btn btn-secondary btn-sm" onclick="exportPDF()">🖨️ 列印/PDF</button>
+        </div>
+      </div>
+      <div id="tbl-container"></div>
+    </div>`;
+
+  // 明確還原篩選狀態
+  const selG    = document.getElementById('sel-group');
+  const selS    = document.getElementById('sel-status');
+  const selName = document.getElementById('sel-name');
+  if (selG)    selG.value    = S.filterGroup;
+  if (selS)    selS.value    = S.filterStatus;
+  if (selName) selName.value = S.filterName;
+  refilter();
+}
+
+/* ═══════════════════════════════════════════
+   COMPANY VIEW (全公司總覽)
+═══════════════════════════════════════════ */
+function _getGroupsData() {
+  const periods = DB.periods().sort((a,b) => b.id.localeCompare(a.id));
+  if (!periods.length) return null;
+  const byMonth = {};
+  periods.forEach(p => { const mk=p.id.slice(0,7); if(!byMonth[mk]||p.id>byMonth[mk].id) byMonth[mk]=p; });
+  const months = Object.keys(byMonth).sort((a,b)=>b.localeCompare(a));
+  if (!S.groupMonth || !byMonth[S.groupMonth]) S.groupMonth = months[0];
+  const period = byMonth[S.groupMonth];
+  let groups = [...new Set(period.data.map(p => p.group))].filter(g=>g).sort();
+  groups = groups.sort((a, b) => {
+    const co = catOrder(a) - catOrder(b);
+    if (co !== 0) return co;
+    const sa = period.data.filter(d=>d.group===a).reduce((s,d)=>s+d.curr_perf,0);
+    const sb = period.data.filter(d=>d.group===b).reduce((s,d)=>s+d.curr_perf,0);
+    return sb - sa;
+  });
+  const flagged = period.data.filter(p => p.needsDiscussion);
+  const { dayRatio = 1, totalDays = 0 } = period.stats;
+  const hasRunway = dayRatio < 1 && totalDays > 0;
+  const totalSum = period.data.reduce((s,p) => s + p.curr_perf, 0);
+  const monthKey = S.groupMonth;
+  const targets = DB.targets();
+  const monthTargets = targets[monthKey] || {};
+  const totalTarget = groups.reduce((s,g) => s + (monthTargets[g]||0), 0);
+  return { periods, byMonth, months, period, groups, flagged, dayRatio, totalDays, hasRunway, totalSum, monthKey, monthTargets, totalTarget };
+}
+function _achieveBadge(curr, target) {
+  if (!target) return '<span style="color:var(--text-muted)">-</span>';
+  const rate = curr / target * 100;
+  const color = rate >= 100 ? 'var(--success)' : rate >= 80 ? 'var(--warning)' : 'var(--accent)';
+  return `<span style="color:${color}; font-weight:600">${rate.toFixed(1)}%</span>`;
+}
+function _progressBar(curr, target) {
+  if (!target) return '';
+  const p = Math.min(curr / target * 100, 100);
+  const color = p >= 100 ? 'var(--success)' : p >= 80 ? 'var(--warning)' : 'var(--accent)';
+  return `<div style="background:#e0e0e0;border-radius:20px;height:6px;margin-top:4px">
+    <div style="background:${color};width:${p}%;height:100%;border-radius:20px"></div></div>`;
+}
+function _statColor(curr, target) {
+  if (!target) return '#fff';
+  const r = curr / target;
+  return r >= 1 ? 'var(--success)' : r >= 0.8 ? 'var(--warning)' : 'var(--accent)';
+}
+
+function renderCompany() {
+  const el = document.getElementById('company-content');
+  const d = _getGroupsData();
+  if (!d) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon">📊</div><div class="empty-title">尚無資料</div><div>請先上傳業績 CSV</div></div>`;
+    return;
+  }
+  const { periods, byMonth, months, period, groups, flagged, dayRatio, hasRunway, totalSum, monthKey, monthTargets, totalTarget } = d;
+  const livestreamData = DB.livestream();
+  const lsAmount = livestreamData[S.groupMonth] || 0;
+
+  el.innerHTML = `
+    <div class="card">
+      <div style="margin-bottom:16px">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px">
+          <div class="card-title" style="margin:0; border:none; padding:0">📊 全公司業績總覽</div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap">
+            <button class="btn btn-secondary btn-sm" onclick="showView('targets')">🎯 設定目標</button>
+          </div>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center">
+          ${months.map(m => `
+            <button class="btn btn-sm ${m===S.groupMonth?'btn-primary':'btn-secondary'}"
+                    onclick="S.groupMonth='${m}'; renderCompany()">
+              ${m}
+            </button>`).join('')}
+        </div>
+        <div style="font-size:12px; color:var(--text-muted); margin-top:8px">
+          📄 資料來源：${period.id}（${period.uploadDate} 上傳）
+          ${periods.filter(p=>p.id.slice(0,7)===S.groupMonth).length > 1
+            ? `· 本月共 ${periods.filter(p=>p.id.slice(0,7)===S.groupMonth).length} 筆上傳，顯示最新一筆`
+            : ''}
+        </div>
+      </div>
+
+      <!-- 分類達成概況 -->
+      ${(() => {
+        const CATS = ['職能','財經','實體'];
+        const catStyle = { '財經': ['#FFF8DC','#7A5C00','💛'], '實體': ['#DBEAFE','#1E40AF','🔵'], '職能': ['#D6EFD8','#1E5C2A','💚'] };
+        let html = `<div style="display:flex; flex-wrap:wrap; gap:12px; margin-bottom:22px">`;
+        CATS.forEach(cat => {
+            const catGroups = groups.filter(g => groupCat(g) === cat);
+            if (!catGroups.length) return;
+            const catData  = period.data.filter(d => groupCat(d.group) === cat);
+            const catSum   = catData.reduce((s,d) => s + d.curr_perf, 0);
+            const catTgt   = catGroups.reduce((s,g) => s + (monthTargets[g]||0), 0);
+            const catRate  = catTgt ? (catSum/catTgt*100).toFixed(1)+'%' : '未設目標';
+            const rateColor= catTgt ? (catSum>=catTgt?'var(--success)':catSum>=catTgt*0.8?'var(--warning)':'var(--accent)') : 'var(--text-muted)';
+            const [bg, tc, icon] = catStyle[cat];
+            const catProj = hasRunway && dayRatio > 0 ? Math.round(catSum / dayRatio) : 0;
+            const catProjRate = catTgt ? (catProj/catTgt*100).toFixed(1)+'%' : '-';
+            const projRateColor = catTgt ? (catProj>=catTgt?'var(--success)':catProj>=catTgt*0.8?'var(--warning)':'var(--accent)') : 'var(--text-muted)';
+            html += `<div style="flex:1; min-width:160px; background:${bg}; border-radius:12px; padding:16px 20px">
+              <div style="font-size:13px; font-weight:700; color:${tc}; margin-bottom:8px">${icon} ${cat}類</div>
+              <div style="font-size:20px; font-weight:700; color:${tc}">${$$(catSum)}</div>
+              <div style="font-size:12px; color:${tc}; opacity:.8; margin-top:2px">${catData.length} 人 · ${catGroups.length} 組</div>
+              <div style="font-size:13px; font-weight:700; color:${rateColor}; margin-top:6px">達成率 ${catRate}</div>
+              ${catTgt ? `<div style="background:rgba(0,0,0,0.08);border-radius:20px;height:5px;margin-top:5px"><div style="background:${rateColor};width:${Math.min(catSum/catTgt*100,100)}%;height:100%;border-radius:20px"></div></div>` : ''}
+              ${hasRunway ? `<div style="margin-top:8px; padding-top:8px; border-top:1px solid rgba(0,0,0,0.1)">
+                <div style="font-size:12px; color:${tc}; opacity:.7">預估整月業績</div>
+                <div style="font-size:17px; font-weight:700; color:${tc}">${$$(catProj)}</div>
+                ${catTgt ? `<div style="font-size:12px; font-weight:700; color:${projRateColor}; margin-top:2px">預估達成率 ${catProjRate}</div>` : ''}
+              </div>` : ''}
+            </div>`;
+        });
+        // 直播類卡片
+        if (lsAmount > 0) {
+          const lsProj = hasRunway && dayRatio > 0 ? Math.round(lsAmount / dayRatio) : 0;
+          html += `<div style="flex:1; min-width:160px; background:#FDE8E8; border-radius:12px; padding:16px 20px">
+            <div style="font-size:13px; font-weight:700; color:#B91C1C; margin-bottom:8px">📺 直播類</div>
+            <div style="font-size:20px; font-weight:700; color:#B91C1C">${$$(lsAmount)}</div>
+            <div style="font-size:12px; color:#B91C1C; opacity:.8; margin-top:2px">XPlatform</div>
+            ${hasRunway ? `<div style="margin-top:8px; padding-top:8px; border-top:1px solid rgba(0,0,0,0.1)">
+              <div style="font-size:12px; color:#B91C1C; opacity:.7">預估整月業績</div>
+              <div style="font-size:17px; font-weight:700; color:#B91C1C">${$$(lsProj)}</div>
+            </div>` : ''}
+          </div>`;
+        }
+        html += `</div>`;
+        return html;
+      })()}
+
+      <!-- 業績加總大卡片 -->
+      <div style="display:flex; flex-wrap:wrap; gap:14px; margin-bottom:22px">
+        <div style="flex:1; min-width:180px; background:linear-gradient(135deg,var(--primary),var(--primary-light)); color:#fff; border-radius:12px; padding:18px 22px">
+          <div style="font-size:13px; opacity:.8; margin-bottom:4px">全隊業績加總</div>
+          <div style="font-size:28px; font-weight:700">${$$(totalSum)}</div>
+          <div style="font-size:12px; opacity:.7; margin-top:4px">${period.data.length} 人</div>
+        </div>
+        ${totalTarget ? `
+        <div style="flex:1; min-width:200px; background:#fff; border:1.5px solid var(--border); border-radius:12px; padding:18px 22px">
+          <div style="font-size:13px; color:var(--text-muted); margin-bottom:4px">本月目標</div>
+          <div style="font-size:24px; font-weight:700; color:var(--text)">${$$(totalTarget)}</div>
+        </div>
+        <div style="flex:1; min-width:200px; background:#fff; border:1.5px solid var(--border); border-radius:12px; padding:18px 22px">
+          <div style="font-size:13px; color:var(--text-muted); margin-bottom:4px">當前達成率</div>
+          <div style="font-size:26px; font-weight:700; color:${_statColor(totalSum, totalTarget)}">${(totalSum/totalTarget*100).toFixed(1)}%</div>
+          ${_progressBar(totalSum, totalTarget)}
+        </div>
+        <div style="flex:1; min-width:200px; background:${totalSum>=totalTarget?'#f0fdf4':'#fff5f5'}; border:1.5px solid ${totalSum>=totalTarget?'#86efac':'#fca5a5'}; border-radius:12px; padding:18px 22px">
+          <div style="font-size:13px; color:var(--text-muted); margin-bottom:4px">目標落差</div>
+          ${totalSum >= totalTarget
+            ? `<div style="font-size:22px; font-weight:700; color:var(--success)">已達標 🎉</div>
+               <div style="font-size:12px; color:var(--success); margin-top:4px">超出 ${$$(totalSum - totalTarget)}</div>`
+            : `<div style="font-size:24px; font-weight:700; color:var(--accent)">－${$$(totalTarget - totalSum)}</div>
+               <div style="font-size:12px; color:var(--text-muted); margin-top:4px">距目標尚差此金額</div>`
+          }
+        </div>
+        ${hasRunway ? `
+        <div style="flex:1; min-width:200px; background:linear-gradient(135deg,#1a3a5c99,#2d598699); color:#fff; border-radius:12px; padding:18px 22px">
+          <div style="font-size:13px; opacity:.8; margin-bottom:4px">預估整月業績</div>
+          <div style="font-size:26px; font-weight:700">${$$(Math.round(totalSum/dayRatio))}</div>
+        </div>
+        <div style="flex:1; min-width:200px; background:#fff; border:1.5px solid var(--border); border-radius:12px; padding:18px 22px">
+          <div style="font-size:13px; color:var(--text-muted); margin-bottom:4px">推估整月達成率</div>
+          <div style="font-size:26px; font-weight:700; color:${_statColor(Math.round(totalSum/dayRatio), totalTarget)}">${(Math.round(totalSum/dayRatio)/totalTarget*100).toFixed(1)}%</div>
+          ${_progressBar(Math.round(totalSum/dayRatio), totalTarget)}
+        </div>` : ''}
+        ` : `
+        <div style="flex:2; min-width:220px; background:#fff8e1; border:1px solid #ffe082; border-radius:12px; padding:18px 22px; display:flex; align-items:center; gap:12px">
+          <span style="font-size:24px">💡</span>
+          <div style="font-size:14px; color:#888">
+            尚未設定本月目標，
+            <button onclick="showView('targets')" style="background:none;border:none;color:var(--primary);cursor:pointer;font-size:14px;font-weight:600;text-decoration:underline;padding:0;font-family:inherit">前往設定</button>
+          </div>
+        </div>`}
+      </div>
+    </div>`;
+}
+
+/* ═══════════════════════════════════════════
+   GROUPS VIEW (團隊組別)
+═══════════════════════════════════════════ */
+function renderGroups() {
+  const el = document.getElementById('groups-content');
+  const d = _getGroupsData();
+  if (!d) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon">🏢</div><div class="empty-title">尚無資料</div><div>請先上傳業績 CSV</div></div>`;
+    return;
+  }
+  const { periods, byMonth, months, period, groups, flagged, dayRatio, hasRunway, totalSum, monthKey, monthTargets, totalTarget } = d;
+
+  el.innerHTML = `
+    <div class="card">
+      <div style="margin-bottom:16px">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px">
+          <div class="card-title" style="margin:0; border:none; padding:0">🏢 各組業績達成</div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap">
+            <button class="btn btn-secondary btn-sm" onclick="showView('targets')">🎯 設定目標</button>
+          </div>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center">
+          ${months.map(m => `
+            <button class="btn btn-sm ${m===S.groupMonth?'btn-primary':'btn-secondary'}"
+                    onclick="S.groupMonth='${m}'; renderGroups()">
+              ${m}
+            </button>`).join('')}
+        </div>
+        <div style="font-size:12px; color:var(--text-muted); margin-top:8px">
+          📄 資料來源：${period.id}（${period.uploadDate} 上傳）
+        </div>
+      </div>
+
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr>
+            <th>組別</th><th>人數</th><th>需談談</th>
+            <th>業績加總</th>${hasRunway ? '<th>預估整月業績</th>' : ''}<th>月目標</th><th>當前達成率</th><th>目標落差</th>
+            ${hasRunway ? '<th>推估整月達成率</th>' : ''}
+            <th>平均業績</th><th>平均通次</th><th>邀約率</th><th>出席率</th><th>成交率</th>
+          </tr></thead>
+          <tbody>
+            ${groups.map(g => {
+              const gp     = period.data.filter(p => p.group === g);
+              const gFlag  = gp.filter(p => p.needsDiscussion).length;
+              const gSum   = gp.reduce((s,p) => s + p.curr_perf, 0);
+              const gAvg   = gp.length ? gSum / gp.length : 0;
+              const gCalls = gp.length ? gp.reduce((s,p)=>s+p.curr_calls,0)/gp.length : 0;
+              const gProj  = hasRunway && dayRatio > 0 ? Math.round(gSum / dayRatio) : 0;
+              const gInvD  = gp.filter(p=>p.curr_inv_rate>0);
+              const gAttD  = gp.filter(p=>p.curr_att_rate>0);
+              const gCvD   = gp.filter(p=>p.curr_conv>0);
+              const gInv   = gInvD.length ? gInvD.reduce((s,p)=>s+p.curr_inv_rate,0)/gInvD.length : 0;
+              const gAtt   = gAttD.length ? gAttD.reduce((s,p)=>s+p.curr_att_rate,0)/gAttD.length : 0;
+              const gCv    = gCvD.length  ? gCvD.reduce((s,p)=>s+p.curr_conv,0)/gCvD.length : 0;
+              const tgt    = monthTargets[g] || 0;
+              return `<tr>
+                <td>${groupBadge(g)}</td>
+                <td>${gp.length} 人</td>
+                <td>${gFlag > 0 ? `<span style="color:var(--accent);font-weight:600">${gFlag} 人</span>` : `<span style="color:var(--success)">0 人</span>`}</td>
+                <td><strong>${$$(gSum)}</strong></td>
+                ${hasRunway ? `<td><strong>${$$(gProj)}</strong></td>` : ''}
+                <td>${tgt ? $$(tgt) : '<span style="color:var(--text-muted)">未設定</span>'}</td>
+                <td>${_achieveBadge(gSum, tgt)}${_progressBar(gSum, tgt)}</td>
+                <td>${!tgt ? '<span style="color:var(--text-muted)">-</span>' : gSum >= tgt
+                  ? `<span style="color:var(--success);font-weight:600">+${$$(gSum-tgt)}</span>`
+                  : `<span style="color:var(--accent);font-weight:600">－${$$(tgt-gSum)}</span>`
+                }</td>
+                ${hasRunway ? `<td>${_achieveBadge(gProj, tgt)}${_progressBar(gProj, tgt)}</td>` : ''}
+                <td>${$$(Math.round(gAvg))}</td>
+                <td>${Math.round(gCalls)} 次</td>
+                <td>${gInv > 0 ? pct(gInv) : '-'}</td>
+                <td>${gAtt > 0 ? pct(gAtt) : '-'}</td>
+                <td>${gCv  > 0 ? pct(gCv)  : '-'}</td>
+              </tr>`;
+            }).join('')}
+            <tr style="background:#f5f7fa; font-weight:600; border-top:2px solid var(--border)">
+              <td>全隊合計</td>
+              <td>${period.data.length} 人</td>
+              <td>${flagged.length > 0 ? `<span style="color:var(--accent)">${flagged.length} 人</span>` : '0 人'}</td>
+              <td><strong>${$$(totalSum)}</strong></td>
+              ${hasRunway ? `<td><strong>${$$(Math.round(totalSum/dayRatio))}</strong></td>` : ''}
+              <td>${totalTarget ? $$(totalTarget) : '<span style="color:var(--text-muted)">-</span>'}</td>
+              <td>${_achieveBadge(totalSum, totalTarget)}${_progressBar(totalSum, totalTarget)}</td>
+              <td>${!totalTarget ? '<span style="color:var(--text-muted)">-</span>' : totalSum >= totalTarget
+                ? `<span style="color:var(--success);font-weight:600">+${$$(totalSum-totalTarget)}</span>`
+                : `<span style="color:var(--accent);font-weight:600">－${$$(totalTarget-totalSum)}</span>`
+              }</td>
+              ${hasRunway ? `<td>${_achieveBadge(Math.round(totalSum/dayRatio), totalTarget)}${_progressBar(Math.round(totalSum/dayRatio), totalTarget)}</td>` : ''}
+              <td>${$$(Math.round(period.stats.avgPerf))}</td>
+              <td>${Math.round(period.stats.avgCalls)} 次</td>
+              <td>-</td><td>-</td><td>-</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+// 跨月比較表用的指標狀態
+if (typeof window._cmpMetric === 'undefined') window._cmpMetric = 'none';
+
+function buildMonthlyComparison(periods, allGroups, yearFilter) {
+  const byMonth = {};
+  periods.forEach(p => {
+    const mk = p.id.slice(0, 7);
+    if (!byMonth[mk] || p.id > byMonth[mk].id) byMonth[mk] = p;
+  });
+  // 若有年份篩選，只顯示該年份的月份（即使沒有資料也生成佔位）
+  let months;
+  if (yearFilter) {
+    months = Array.from({length:12}, (_,i) => `${yearFilter}-${String(i+1).padStart(2,'0')}`)
+                  .filter(m => byMonth[m]); // 只顯示有上傳資料的月份
+  } else {
+    months = Object.keys(byMonth).sort((a,b) => b.localeCompare(a));
+  }
+  months = months.sort((a,b) => a.localeCompare(b)); // 由舊到新（左→右）
+  if (months.length < 1) return `
+    <div class="card">
+      <div class="card-title">📊 跨月組別比較</div>
+      <p style="font-size:14px; color:var(--text-muted)">${yearFilter?yearFilter+'年尚無上傳資料。':'上傳資料後即可在此查看跨月比較。'}</p>
+    </div>`;
+
+  const targets = DB.targets();
+  const groups  = allGroups.length ? allGroups :
+    [...new Set(periods.flatMap(p => p.data.map(d => d.group)).filter(Boolean))].sort();
+
+  // 額外指標（可選，預設不顯示）
+  const EXTRA = [
+    { key:'none',  label:'不顯示' },
+    { key:'calls', label:'＋平均通次' },
+    { key:'inv',   label:'＋平均邀約率' },
+    { key:'att',   label:'＋平均出席率' },
+  ];
+  const extra = window._cmpMetric || 'none';
+  const showExtra = extra !== 'none';
+  const colsPerMonth = showExtra ? 4 : 3; // 業績 + 人數 + 達成率 [+ 額外]
+
+  // 計算 group × month 的固定三格 + 額外格
+  function grpCells(g, m) {
+    const mp = byMonth[m];
+    if (!mp) return `<td colspan="${colsPerMonth}" style="text-align:center;color:var(--text-muted)">—</td>`;
+    const gp = mp.data.filter(d => d.group === g);
+    if (!gp.length) return `<td colspan="${colsPerMonth}" style="text-align:center;color:var(--text-muted)">—</td>`;
+
+    const sum = gp.reduce((s,d)=>s+d.curr_perf,0);
+    const tgt = (targets[m]||{})[g] || 0;
+    const rate = tgt ? sum/tgt*100 : null;
+    const rc = rate!==null ? (rate>=100?'var(--success)':rate>=80?'var(--warning)':'var(--accent)') : 'var(--text-muted)';
+
+    let extraCell = '';
+    if (showExtra) {
+      let ev = '-';
+      if (extra==='calls') ev = (gp.reduce((s,d)=>s+d.curr_calls,0)/gp.length).toFixed(1);
+      else if (extra==='inv') { const d=gp.filter(p=>p.curr_inv_rate>0); ev=d.length?pct(d.reduce((s,p)=>s+p.curr_inv_rate,0)/d.length):'-'; }
+      else if (extra==='att') { const d=gp.filter(p=>p.curr_att_rate>0); ev=d.length?pct(d.reduce((s,p)=>s+p.curr_att_rate,0)/d.length):'-'; }
+      extraCell = `<td style="text-align:center;min-width:70px;color:var(--text-muted)">${ev}</td>`;
+    }
+    return `
+      <td style="text-align:right;min-width:90px;font-weight:600">${$$(sum)}</td>
+      <td style="text-align:center;min-width:50px;color:var(--text-muted)">${gp.length}人</td>
+      <td style="text-align:center;min-width:70px;font-weight:700;color:${rc}">${rate!==null?rate.toFixed(1)+'%':'—'}</td>
+      ${extraCell}`;
+  }
+
+  // 小計列：category × month
+  function subtotalCells(cgs, m) {
+    const mp = byMonth[m];
+    if (!mp) return `<td colspan="${colsPerMonth}" style="text-align:center">—</td>`;
+    const cgp = mp.data.filter(d => cgs.includes(d.group));
+    const sum = cgp.reduce((s,d)=>s+d.curr_perf,0);
+    const tgt = cgs.reduce((s,g)=>s+((targets[m]||{})[g]||0),0);
+    const rate = tgt ? sum/tgt*100 : null;
+    const rc = rate!==null ? (rate>=100?'var(--success)':rate>=80?'var(--warning)':'var(--accent)') : 'var(--text-muted)';
+    let extraCell = '';
+    if (showExtra) {
+      let ev = '-';
+      if (extra==='calls') { const d=cgp.filter(p=>p.curr_calls>0); ev=d.length?(d.reduce((s,p)=>s+p.curr_calls,0)/d.length).toFixed(1):'-'; }
+      else if (extra==='inv') { const d=cgp.filter(p=>p.curr_inv_rate>0); ev=d.length?pct(d.reduce((s,p)=>s+p.curr_inv_rate,0)/d.length):'-'; }
+      else if (extra==='att') { const d=cgp.filter(p=>p.curr_att_rate>0); ev=d.length?pct(d.reduce((s,p)=>s+p.curr_att_rate,0)/d.length):'-'; }
+      extraCell = `<td style="text-align:center;color:var(--text-muted)">${ev}</td>`;
+    }
+    return `
+      <td style="text-align:right;font-weight:600">${$$(sum)}</td>
+      <td style="text-align:center;color:var(--text-muted)">${cgp.length}人</td>
+      <td style="text-align:center;font-weight:700;color:${rc}">${rate!==null?rate.toFixed(1)+'%':'—'}</td>
+      ${extraCell}`;
+  }
+
+  // 全隊合計列
+  function totalCells(m) {
+    const mp = byMonth[m];
+    if (!mp) return `<td colspan="${colsPerMonth}" style="text-align:center">—</td>`;
+    const sum = mp.data.reduce((s,d)=>s+d.curr_perf,0);
+    const tgt = groups.reduce((s,g)=>s+((targets[m]||{})[g]||0),0);
+    const rate = tgt ? sum/tgt*100 : null;
+    const rc = rate!==null ? (rate>=100?'var(--success)':rate>=80?'var(--warning)':'var(--accent)') : 'var(--text-muted)';
+    let extraCell = '';
+    if (showExtra) {
+      let ev = '-';
+      if (extra==='calls') { const d=mp.data.filter(p=>p.curr_calls>0); ev=d.length?(d.reduce((s,p)=>s+p.curr_calls,0)/d.length).toFixed(1):'-'; }
+      else if (extra==='inv') { const d=mp.data.filter(p=>p.curr_inv_rate>0); ev=d.length?pct(d.reduce((s,p)=>s+p.curr_inv_rate,0)/d.length):'-'; }
+      else if (extra==='att') { const d=mp.data.filter(p=>p.curr_att_rate>0); ev=d.length?pct(d.reduce((s,p)=>s+p.curr_att_rate,0)/d.length):'-'; }
+      extraCell = `<td style="text-align:center">${ev}</td>`;
+    }
+    return `
+      <td style="text-align:right"><strong>${$$(sum)}</strong></td>
+      <td style="text-align:center;color:var(--text-muted)">${mp.data.length}人</td>
+      <td style="text-align:center;font-weight:700;color:${rc}">${rate!==null?rate.toFixed(1)+'%':'—'}</td>
+      ${extraCell}`;
+  }
+
+  const CATS = ['職能','財經','實體'];
+  const catGroups = {};
+  CATS.forEach(c => { catGroups[c] = groups.filter(g=>groupCat(g)===c); });
+  const totalCols = 1 + months.length * colsPerMonth;
+
+  function groupRows() {
+    let html = '';
+    CATS.forEach(cat => {
+      const cgs = catGroups[cat];
+      if (!cgs.length) return;
+      html += `<tr style="background:#f0f4f8">
+        <td colspan="${totalCols}" style="padding:6px 14px;font-size:12px;font-weight:700;color:var(--primary)">▸ ${cat}類</td>
+      </tr>`;
+      cgs.forEach(g => {
+        html += `<tr><td style="white-space:nowrap;padding-left:18px">${groupBadge(g)}</td>
+          ${months.map(m => grpCells(g,m)).join('')}
+        </tr>`;
+      });
+      html += `<tr style="background:#f8f9fb;font-size:13px">
+        <td style="padding-left:14px;color:var(--text-muted);font-weight:600">${cat} 小計</td>
+        ${months.map(m => subtotalCells(cgs, m)).join('')}
+      </tr>`;
+    });
+    return html;
+  }
+
+  // 副標題列：每月顯示 3（或 4）個小標題
+  const subHdrs = ['當月業績','人數','達成率', ...(showExtra ? [EXTRA.find(e=>e.key===extra)?.label.replace('＋','') || ''] : [])];
+
+  return `
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px">
+        <div class="card-title" style="margin:0;border:none;padding:0">📊 跨月組別比較${yearFilter?' — '+yearFilter+'年':''}</div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center">
+          <span style="font-size:12px;color:var(--text-muted)">額外顯示：</span>
+          ${EXTRA.map(({key,label}) => `
+            <button class="btn btn-sm ${extra===key?'btn-primary':'btn-secondary'}"
+                    onclick="window._cmpMetric='${key}'; renderTargets()">
+              ${label}
+            </button>`).join('')}
+        </div>
+      </div>
+      <p style="font-size:12px; color:var(--text-muted); margin-bottom:12px">每月取最後一筆上傳資料，固定顯示當月業績／人數／達成率。</p>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th rowspan="2" style="min-width:120px;vertical-align:middle">組別</th>
+              ${months.map(m => {
+                const mp = byMonth[m];
+                const ppl = mp ? mp.data.length : 0;
+                const gc  = mp ? [...new Set(mp.data.map(d=>d.group).filter(Boolean))].length : 0;
+                return `<th colspan="${colsPerMonth}" style="text-align:center;border-bottom:1px solid var(--border)">
+                  <div style="font-weight:700">${m}</div>
+                  ${mp?`<div style="font-size:11px;font-weight:400;color:var(--text-muted)">${ppl}人 · ${gc}組</div>`:''}
+                </th>`;
+              }).join('')}
+            </tr>
+            <tr style="font-size:11px;color:var(--text-muted);font-weight:600">
+              ${months.map(() => subHdrs.map(h=>`<th style="text-align:center;padding:5px 8px;background:#fafbfc">${h}</th>`).join('')).join('')}
+            </tr>
+          </thead>
+          <tbody>
+            ${groupRows()}
+            <tr style="background:#e8edf3;font-weight:700;border-top:2px solid var(--border)">
+              <td>全隊合計</td>
+              ${months.map(m => totalCells(m)).join('')}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+/* ═══════════════════════════════════════════
+   TARGETS INPUT (rendered on upload page)
+═══════════════════════════════════════════ */
+function renderTargetsInput() {
+  const el = document.getElementById('targets-input-content');
+  if (!el) return;
+
+  const periods  = DB.periods().sort((a,b) => b.id.localeCompare(a.id));
+  const targets  = DB.targets();
+  const allGroups = [...new Set(periods.flatMap(p=>p.data.map(d=>d.group)).filter(Boolean))].sort();
+
+  // ── 年份處理 ──
+  const dataYears = [...new Set(periods.map(p=>p.id.slice(0,4)))].sort().reverse();
+  const thisYear  = String(new Date().getFullYear());
+  const tgtYears  = [...new Set(Object.keys(targets).map(m=>m.slice(0,4)))];
+  const allYears  = [...new Set([...dataYears,...tgtYears,...[thisYear]])].sort().reverse();
+
+  if (!S.targetYear) S.targetYear = allYears[0] || thisYear;
+
+  const yearMonths = Array.from({length:12}, (_,i) => `${S.targetYear}-${String(i+1).padStart(2,'0')}`);
+
+  // targetMonth 重設
+  const byMonth = {};
+  periods.forEach(p => { const mk=p.id.slice(0,7); if(!byMonth[mk]||p.id>byMonth[mk].id) byMonth[mk]=p; });
+  if (!S.targetMonth || !yearMonths.includes(S.targetMonth)) {
+    const latest = [...yearMonths].reverse().find(m => byMonth[m] || targets[m]);
+    S.targetMonth = latest || yearMonths[new Date().getMonth()];
+  }
+
+  const curTargets = targets[S.targetMonth] || {};
+
+  el.innerHTML = `
+    <div class="card">
+      <div class="card-title" style="margin-bottom:14px">🎯 月份目標設定</div>
+
+      <!-- 年份 pills -->
+      <div style="display:flex; gap:5px; flex-wrap:wrap; margin-bottom:12px; align-items:center">
+        <span style="font-size:13px; color:var(--text-muted); margin-right:4px">年份：</span>
+        ${allYears.map(y => `
+          <button class="btn btn-sm ${y===S.targetYear?'btn-primary':'btn-secondary'}"
+                  onclick="S.targetYear='${y}'; S.targetMonth=null; renderTargetsInput()">
+            ${y}
+          </button>`).join('')}
+        <input id="custom-month-input2" type="text" placeholder="自訂月份 如 2025-06"
+               style="width:148px; padding:5px 10px; border:1.5px solid var(--border); border-radius:8px; font-size:13px; font-family:inherit; margin-left:6px">
+        <button class="btn btn-secondary btn-sm" onclick="addCustomMonth2()">＋</button>
+      </div>
+
+      <!-- 月份 pills (1→12) -->
+      <div style="display:flex; gap:5px; flex-wrap:wrap; margin-bottom:18px">
+        ${yearMonths.map(m => {
+          const hasTgt = Object.keys(targets[m]||{}).length > 0;
+          const hasDat = !!byMonth[m];
+          const isActive = m === S.targetMonth;
+          const lbl = parseInt(m.slice(5))+'月';
+          return `<button class="btn btn-sm ${isActive?'btn-primary':hasTgt||hasDat?'btn-secondary':''}"
+                    style="${!isActive&&!hasTgt&&!hasDat?'opacity:.55;border:1.5px dashed var(--border);background:#fafafa':''}"
+                    onclick="S.targetMonth='${m}'; renderTargetsInput()">${lbl}</button>`;
+        }).join('')}
+      </div>
+
+      <!-- 各組別目標輸入 -->
+      ${allGroups.length ? `
+      <div style="font-size:13px; font-weight:600; color:var(--text-muted); margin-bottom:10px">
+        ${S.targetMonth ? parseInt(S.targetMonth.slice(5))+'月' : ''}各組業績目標（萬）
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(180px,1fr)); gap:10px; margin-bottom:16px">
+        ${allGroups.map(g => `
+          <div style="background:#f8fafc; border:1.5px solid var(--border); border-radius:10px; padding:10px 12px">
+            <div style="font-size:12px; margin-bottom:6px">${groupBadge(g)}</div>
+            <input id="tgt-${g}" type="number" min="0" step="0.1"
+                   value="${curTargets[g] !== undefined ? curTargets[g] : ''}"
+                   placeholder="目標金額"
+                   style="width:100%; padding:6px 10px; border:1.5px solid var(--border); border-radius:8px; font-size:14px; font-family:inherit">
+          </div>`).join('')}
+      </div>
+      <button class="btn btn-primary" onclick="saveTargets('${S.targetMonth}')">💾 儲存 ${S.targetMonth ? parseInt(S.targetMonth.slice(5))+'月' : ''}目標</button>
+      ` : `<div style="color:var(--text-muted); font-size:14px">請先上傳業績 CSV 才能設定目標</div>`}
+    </div>`;
+}
+
+function saveTargets(monthKey) {
+  const targets = DB.targets();
+  if (!targets[monthKey]) targets[monthKey] = {};
+  document.querySelectorAll('[id^="tgt-"]').forEach(input => {
+    const g = input.id.slice(4); // 去掉 "tgt-" 前綴
+    const val = parseFloat(input.value || '0') || 0;
+    targets[monthKey][g] = val;
+  });
+  DB.setTargets(targets);
+  toast('目標已儲存，本月所有期別自動套用', 'success');
+  renderGroups();
+  renderTargetsInput(); // 重新渲染上傳頁的目標輸入（若當前在上傳頁）
+}
+
+/* ═══════════════════════════════════════════
+   TARGETS VIEW
+═══════════════════════════════════════════ */
+function renderTargets() {
+  const periods = DB.periods().sort((a,b) => b.id.localeCompare(a.id));
+  const el = document.getElementById('targets-content');
+
+  if (!periods.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon">🎯</div><div class="empty-title">尚無資料</div><div>請先上傳業績 CSV 後即可設定目標</div></div>`;
+    return;
+  }
+
+  // 每月取最新一筆
+  const byMonth = {};
+  periods.forEach(p => { const mk=p.id.slice(0,7); if(!byMonth[mk]||p.id>byMonth[mk].id) byMonth[mk]=p; });
+
+  const allGroups  = [...new Set(periods.flatMap(p=>p.data.map(d=>d.group)).filter(Boolean))].sort();
+  const targets    = DB.targets();
+
+  // ── 年份處理 ──
+  const dataYears  = [...new Set(periods.map(p=>p.id.slice(0,4)))].sort().reverse();
+  const thisYear   = String(new Date().getFullYear());
+  if (!S.targetYear) S.targetYear = dataYears[0] || thisYear;
+  // 加入設定過目標但無資料的年份
+  const tgtYears   = [...new Set(Object.keys(targets).map(m=>m.slice(0,4)))];
+  const allYears   = [...new Set([...dataYears,...tgtYears])].sort().reverse();
+
+  // 選定年份的 12 個月
+  const yearMonths = Array.from({length:12}, (_,i) => `${S.targetYear}-${String(i+1).padStart(2,'0')}`);
+
+  // targetMonth 重設：切換年份後預設到該年最新有資料的月份
+  const hasDataInYear = yearMonths.some(m => byMonth[m] || targets[m]);
+  if (!S.targetMonth || !yearMonths.includes(S.targetMonth)) {
+    const latest = [...yearMonths].reverse().find(m => byMonth[m] || targets[m]);
+    S.targetMonth = latest || yearMonths[11]; // 預設 12 月
+  }
+
+  // (目標設定已移至「上傳資料」分頁)
+
+  el.innerHTML = `
+    <!-- ① 年份選擇 + 月份概覽卡片 -->
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px">
+        <div class="card-title" style="margin:0;border:none;padding:0">📅 各月份概覽</div>
+        <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap">
+          <!-- 年份 pills -->
+          <div style="display:flex; gap:5px; border-right:1.5px solid var(--border); padding-right:10px; margin-right:4px">
+            ${allYears.map(y => `
+              <button class="btn btn-sm ${y===S.targetYear?'btn-primary':'btn-secondary'}"
+                      onclick="S.targetYear='${y}'; S.targetMonth=null; renderTargets()">
+                ${y}
+              </button>`).join('')}
+          </div>
+          <input id="custom-month-input" type="text" placeholder="新增月份 如 2026-05"
+                 style="width:148px; padding:6px 10px; border:1.5px solid var(--border); border-radius:8px; font-size:13px; font-family:inherit">
+          <button class="btn btn-secondary btn-sm" onclick="addCustomMonth()">＋</button>
+        </div>
+      </div>
+
+      <!-- 12 個月卡片 grid，固定顯示業績加總 / 達成率 / 人數 -->
+      <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(160px,1fr)); gap:10px">
+        ${yearMonths.map(m => {
+          const mp      = byMonth[m];
+          const mt      = targets[m] || {};
+          const mSum    = mp ? mp.data.reduce((s,d)=>s+d.curr_perf,0) : null;
+          const mTgt    = allGroups.reduce((s,g)=>s+(mt[g]||0),0);
+          const rate    = mSum !== null && mTgt ? (mSum/mTgt*100) : null;
+          const rateStr = rate !== null ? rate.toFixed(1)+'%' : (mSum !== null ? '未設目標' : '-');
+          const rateColor = rate !== null ? (rate>=100?'var(--success)':rate>=80?'var(--warning)':'var(--accent)') : 'var(--text-muted)';
+          const mPeople = mp ? mp.data.length : null;
+          const isActive = m === S.targetMonth;
+          const hasAny  = mp || mt.length;
+          const monthLabel = parseInt(m.slice(5))+'月'; // "3月"
+          return `
+          <div onclick="S.targetMonth='${m}'; renderTargets()"
+               style="background:${isActive?'var(--primary)':'#fff'}; border:2px solid ${isActive?'var(--primary)':mp?'var(--border)':'#eaeaea'}; border-radius:12px; padding:14px 12px; cursor:pointer; transition:all .2s; opacity:${mp||mTgt?1:0.55}">
+            <div style="font-size:12px; font-weight:700; color:${isActive?'rgba(255,255,255,0.75)':'var(--text-muted)'}; margin-bottom:6px">${monthLabel}</div>
+
+            <!-- 業績加總 -->
+            <div style="font-size:11px; color:${isActive?'rgba(255,255,255,0.6)':'var(--text-muted)'}">業績加總</div>
+            <div style="font-size:16px; font-weight:700; color:${isActive?'#fff':'var(--text)'}; margin-bottom:4px">
+              ${mSum !== null ? $$(mSum) : '—'}
+            </div>
+
+            <!-- 達成率 -->
+            <div style="font-size:11px; color:${isActive?'rgba(255,255,255,0.6)':'var(--text-muted)'}">達成率</div>
+            <div style="font-size:15px; font-weight:700; color:${isActive?'rgba(255,255,255,0.95)':rateColor}; margin-bottom:${rate!==null?2:4}px">${rateStr}</div>
+            ${rate !== null ? `<div style="background:${isActive?'rgba(255,255,255,0.25)':'#e9ecf0'};border-radius:20px;height:3px;margin-bottom:6px">
+              <div style="background:${isActive?'#fff':rateColor};width:${Math.min(rate,100)}%;height:100%;border-radius:20px"></div>
+            </div>` : ''}
+
+            <!-- 人數 -->
+            <div style="font-size:11px; color:${isActive?'rgba(255,255,255,0.6)':'var(--text-muted)'}">人數</div>
+            <div style="font-size:13px; font-weight:600; color:${isActive?'rgba(255,255,255,0.9)':'var(--text)'}">
+              ${mPeople !== null ? mPeople+' 人' : '未上傳'}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+
+    <!-- ② 跨月比較表 -->
+    ${buildMonthlyComparison(periods, allGroups, S.targetYear)}
+
+    <!-- ③ 趨勢圖 -->
+    <div class="card">
+      <div class="card-title" style="margin-bottom:18px">📈 各組月份趨勢（${S.targetYear}）</div>
+      <div class="charts-grid">
+        <div class="chart-wrap">
+          <div class="chart-title">各組業績加總趨勢</div>
+          <div class="chart-container" style="height:240px"><canvas id="chart-grp-perf"></canvas></div>
+        </div>
+        <div class="chart-wrap">
+          <div class="chart-title">各組達成率趨勢（%）</div>
+          <div class="chart-container" style="height:240px"><canvas id="chart-grp-rate"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    `;
+
+  // 趨勢圖只顯示選定年份的資料
+  const yearPeriods = periods.filter(p => p.id.startsWith(S.targetYear));
+  setTimeout(() => buildGroupTrendCharts(yearPeriods.length ? yearPeriods : periods, allGroups), 80);
+}
+
+function buildGroupTrendCharts(periods, allGroups) {
+  // 每月取最新一筆
+  const byMonth = {};
+  periods.forEach(p => { const mk=p.id.slice(0,7); if(!byMonth[mk]||p.id>byMonth[mk].id) byMonth[mk]=p; });
+  const months = Object.keys(byMonth).sort(); // 由舊到新
+  if (months.length < 1) return;
+
+  const targets = DB.targets();
+  const COLORS  = ['#1a3a5c','#27ae60','#e74c3c','#f39c12','#8e44ad','#2980b9','#e67e22','#16a085'];
+
+  function mkLine(id, datasets, yFmt) {
+    const ctx = document.getElementById(id);
+    if (!ctx) return;
+    if (S.charts[id]) { try{ S.charts[id].destroy(); }catch{} }
+    S.charts[id] = new Chart(ctx, {
+      type: 'line',
+      data: { labels: months, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { font:{ size:12 }, padding:12 } } },
+        scales: {
+          y: { beginAtZero: true, grid:{ color:'#f0f0f0' },
+               ticks:{ font:{ size:11 }, callback: yFmt } },
+          x: { grid:{ color:'#f0f0f0' }, ticks:{ font:{ size:11 } } }
+        }
+      }
+    });
+  }
+
+  // 業績趨勢
+  mkLine('chart-grp-perf',
+    allGroups.map((g,i) => ({
+      label: g,
+      data: months.map(m => {
+        const mp = byMonth[m];
+        return mp ? mp.data.filter(d=>d.group===g).reduce((s,d)=>s+d.curr_perf,0) : 0;
+      }),
+      borderColor: COLORS[i%COLORS.length],
+      backgroundColor: COLORS[i%COLORS.length]+'22',
+      fill: false, tension:.4, pointRadius:5, borderWidth:2.5
+    })),
+    v => '$'+(v>=10000?(v/10000).toFixed(0)+'萬':v.toLocaleString())
+  );
+
+  // 達成率趨勢
+  mkLine('chart-grp-rate',
+    allGroups.map((g,i) => ({
+      label: g,
+      data: months.map(m => {
+        const mp  = byMonth[m];
+        const tgt = (targets[m]||{})[g];
+        if (!mp || !tgt) return null;
+        const sum = mp.data.filter(d=>d.group===g).reduce((s,d)=>s+d.curr_perf,0);
+        return parseFloat((sum/tgt*100).toFixed(1));
+      }),
+      borderColor: COLORS[i%COLORS.length],
+      backgroundColor: COLORS[i%COLORS.length]+'22',
+      fill: false, tension:.4, pointRadius:5, borderWidth:2.5,
+      spanGaps: true
+    })),
+    v => v+'%'
+  );
+}
+
+function addCustomMonth2() {
+  const val = (document.getElementById('custom-month-input2')?.value||'').trim();
+  if (!/^\d{4}-\d{2}$/.test(val)) { toast('格式錯誤，請輸入如 2025-06', 'error'); return; }
+  S.targetYear  = val.slice(0,4);
+  S.targetMonth = val;
+  renderTargets();
+}
+
+function addCustomMonth() {
+  const val = (document.getElementById('custom-month-input')?.value||'').trim();
+  if (!/^\d{4}-\d{2}$/.test(val)) { toast('格式錯誤，請輸入如 2026-05', 'error'); return; }
+  S.targetMonth = val;
+  renderTargets();
+}
+
+// 依目前規則重新計算所有期別的警示（設定變更後呼叫）
+function recalcAlerts() {
+  const periods = DB.periods();
+  if (!periods.length) return;
+  const updated = periods.map(period => {
+    const stats = period.stats;
+    const data = period.data.map(p => {
+      const alerts = analyse(p, stats);
+      return { ...p, alerts, needsDiscussion: alerts.length > 0 };
+    });
+    return { ...period, data };
+  });
+  DB.save(updated);
+}
+
+function changePeriod(id) {
+  S.periodId = id;
+  updateNavPeriod();
+  renderOverview();
+}
+
+function sortByCol(col) {
+  if (S.sortBy === col+'_desc') S.sortBy = col+'_asc';
+  else S.sortBy = col+'_desc';
+  refilter();
+}
+
+function refilter() {
+  const g  = (document.getElementById('sel-group')  || {}).value  || '';
+  const st = (document.getElementById('sel-status') || {}).value  || '';
+  const nm = ((document.getElementById('sel-name')  || {}).value  || '').trim();
+  S.filterGroup  = g;
+  S.filterStatus = st;
+  S.filterName   = nm;
+  const period = DB.periods().find(p => p.id === S.periodId);
+  if (!period) return;
+
+  // 計算篩選後的資料
+  let rows = period.data;
+  if (g)             rows = rows.filter(p => p.group === g);
+  if (st === 'flag') rows = rows.filter(p => p.needsDiscussion);
+  if (st === 'ok')   rows = rows.filter(p => !p.needsDiscussion);
+  if (nm)            rows = rows.filter(p => p.name && p.name.toLowerCase().includes(nm.toLowerCase()));
+
+  // 更新統計卡片
+  const { dayRatio = 1, totalDays = 0 } = period.stats;
+  const hasRunway = dayRatio < 1 && totalDays > 0;
+  const fStats  = teamStats(rows);
+  const flagCnt = rows.filter(p => p.needsDiscussion).length;
+  const sc = id => document.getElementById(id);
+  const sumPerf = rows.reduce((s, p) => s + p.curr_perf, 0);
+  if (sc('sc-total'))     sc('sc-total').textContent     = rows.length;
+  if (sc('sc-flag'))      sc('sc-flag').textContent      = flagCnt;
+  if (sc('sc-ok'))        sc('sc-ok').textContent        = rows.length - flagCnt;
+  if (sc('sc-sum-perf'))  sc('sc-sum-perf').textContent  = $$(sumPerf);
+  if (sc('sc-avg-perf'))  sc('sc-avg-perf').textContent  = $$(fStats.avgPerf);
+  if (sc('sc-proj-perf')) sc('sc-proj-perf').textContent = (hasRunway && fStats.avgPerf > 0) ? $$(Math.round(fStats.avgPerf / dayRatio)) : '-';
+  if (sc('sc-avg-calls')) sc('sc-avg-calls').textContent = Math.round(fStats.avgCalls);
+
+  document.getElementById('tbl-container').innerHTML = buildTable(period.data, g, st);
+}
+
+function buildTable(data, gFilter, stFilter) {
+  let rows = data;
+  if (gFilter)             rows = rows.filter(p => p.group === gFilter);
+  if (stFilter === 'flag') rows = rows.filter(p => p.needsDiscussion);
+  if (stFilter === 'ok')   rows = rows.filter(p => !p.needsDiscussion);
+  if (S.filterName)        rows = rows.filter(p => p.name && p.name.toLowerCase().includes(S.filterName.toLowerCase()));
+  if (!rows.length) return `<div class="empty-state" style="padding:32px"><div>無符合條件的人員</div></div>`;
+
+  // 排序
+  const sortFn = (a, b) => {
+    if (S.sortBy === 'group') {
+      // 預設：職能→財經→實體，同組內需談談優先，再依業績
+      const co = catOrder(a.group) - catOrder(b.group);
+      if (co !== 0) return co;
+      const gc = (a.group||'').localeCompare(b.group||'');
+      if (gc !== 0) return gc;
+      if (a.needsDiscussion !== b.needsDiscussion) return b.needsDiscussion ? 1 : -1;
+      return b.curr_perf - a.curr_perf;
+    }
+    // 欄位排序時，需談談永遠優先
+    if (a.needsDiscussion !== b.needsDiscussion) return b.needsDiscussion ? 1 : -1;
+    if (S.sortBy === 'perf_desc')  return b.curr_perf - a.curr_perf;
+    if (S.sortBy === 'perf_asc')   return a.curr_perf - b.curr_perf;
+    if (S.sortBy === 'diff_desc')  return (b.curr_perf - b.prev_perf) - (a.curr_perf - a.prev_perf);
+    if (S.sortBy === 'diff_asc')   return (a.curr_perf - a.prev_perf) - (b.curr_perf - b.prev_perf);
+    if (S.sortBy === 'calls_desc') return b.curr_calls - a.curr_calls;
+    if (S.sortBy === 'calls_asc')  return a.curr_calls - b.curr_calls;
+    if (S.sortBy === 'inv_desc')   return b.curr_inv_rate - a.curr_inv_rate;
+    if (S.sortBy === 'inv_asc')    return a.curr_inv_rate - b.curr_inv_rate;
+    if (S.sortBy === 'att_desc')   return b.curr_att_rate - a.curr_att_rate;
+    if (S.sortBy === 'att_asc')    return a.curr_att_rate - b.curr_att_rate;
+    if (S.sortBy === 'conv_desc')  return b.curr_conv - a.curr_conv;
+    if (S.sortBy === 'conv_asc')   return a.curr_conv - b.curr_conv;
+    if (S.sortBy === 'ref_desc')   return b.curr_ref_amt - a.curr_ref_amt;
+    if (S.sortBy === 'ref_asc')    return a.curr_ref_amt - b.curr_ref_amt;
+    if (S.sortBy === 'grp_asc')    return (a.group||'').localeCompare(b.group||'');
+    if (S.sortBy === 'grp_desc')   return (b.group||'').localeCompare(a.group||'');
+    return b.curr_perf - a.curr_perf;
+  };
+  rows = [...rows].sort(sortFn);
+
+  // 欄位標題輔助
+  const hdr = (col, label) => {
+    const isActive = S.sortBy.startsWith(col);
+    const arrow = S.sortBy === col+'_asc' ? ' ▲' : S.sortBy === col+'_desc' ? ' ▼' : ' ⇅';
+    return `<th onclick="sortByCol('${col}')" style="cursor:pointer;user-select:none;white-space:nowrap;color:${isActive?'var(--primary)':'inherit'}">${label}<span style="font-size:10px;opacity:.7">${arrow}</span></th>`;
+  };
+
+  // 建立列，group 模式下插入分組分隔列
+  let bodyHtml = '';
+  let lastGroup = null;
+  rows.forEach(p => {
+    if (S.sortBy === 'group' && p.group !== lastGroup) {
+      lastGroup = p.group;
+      bodyHtml += `<tr style="background:#eef2f7;pointer-events:none">
+        <td colspan="11" style="padding:6px 14px;font-size:12px;font-weight:700;color:var(--primary);border-bottom:1px solid var(--border)">
+          ${groupBadge(p.group)}
+        </td>
+      </tr>`;
+    }
+    const pIdx = data.indexOf(p);
+    bodyHtml += `
+    <tr class="${p.needsDiscussion ? 'tr-flag' : ''}">
+      <td><strong>${p.name}</strong></td>
+      <td>${groupBadge(p.group)}</td>
+      <td><strong>${$$(p.curr_perf)}</strong></td>
+      <td>${trendBadge(p.curr_perf, p.prev_perf)}</td>
+      <td>${p.curr_calls}</td>
+      <td>${p.curr_inv_rate > 0 ? pct(p.curr_inv_rate) : '-'}</td>
+      <td>${p.curr_att_rate > 0 ? pct(p.curr_att_rate) : '-'}</td>
+      <td>${p.curr_conv     > 0 ? pct(p.curr_conv)     : '-'}</td>
+      <td>${p.curr_ref_amt  > 0 ? $$(p.curr_ref_amt)   : '-'}</td>
+      <td>${p.needsDiscussion
+        ? `<span class="badge badge-danger">💬 需談談 (${p.alerts.length})</span>`
+        : `<span class="badge badge-success">✓ 正常</span>`}</td>
+      <td><button class="btn btn-primary btn-sm" onclick="viewPersonByIdx(${pIdx})">詳情</button></td>
+    </tr>`;
+  });
+
+  return `<div class="tbl-wrap">
+    <table>
+      <thead><tr>
+        <th>姓名</th>${hdr('grp','組別')}
+        ${hdr('perf','本期業績')}
+        ${hdr('diff','較上期')}
+        ${hdr('calls','通次')}
+        ${hdr('inv','邀約率')}
+        ${hdr('att','出席率')}
+        ${hdr('conv','成交率')}
+        ${hdr('ref','退費金額')}
+        <th>狀態</th><th>詳情</th>
+      </tr></thead>
+      <tbody>${bodyHtml}</tbody>
+    </table>
+  </div>`;
+}
+
+/* ═══════════════════════════════════════════
+   PERSON DETAIL
+═══════════════════════════════════════════ */
+function viewPersonByIdx(idx) {
+  const period = DB.periods().find(p => p.id === S.periodId);
+  if (!period || idx < 0 || idx >= period.data.length) return;
+  S.personIdx = idx;
+  showView('detail');
+  renderDetail();
+  setTimeout(() => window.scrollTo({ top: 0, behavior: 'auto' }), 0);
+}
+
+function renderDetail() {
+  const period = DB.periods().find(p => p.id === S.periodId);
+  if (!period) return;
+  const p = period.data[S.personIdx];
+  if (!p) return;
+  S.personKey = personKey(p);
+
+  const topicKey = `${S.periodId}__${S.personKey}`;
+  const savedTopic = DB.topics()[topicKey] || '';
+
+  const el = document.getElementById('detail-content');
+  el.innerHTML = `
+    <button class="back-btn" onclick="showView('overview')">← 返回總覽</button>
+
+    <div class="card">
+      <div class="person-header">
+        <div class="avatar">${p.name.charAt(0)}</div>
+        <div>
+          <div class="person-name">${p.name}</div>
+          <div class="person-group">${p.group}</div>
+        </div>
+        <div style="margin-left:auto">
+          ${p.needsDiscussion
+            ? `<span class="badge badge-danger" style="font-size:14px; padding:6px 16px">💬 需要談談</span>`
+            : `<span class="badge badge-success" style="font-size:14px; padding:6px 16px">✓ 表現正常</span>`}
+        </div>
+      </div>
+
+      <div class="stats-grid" style="margin-bottom:0">
+        <div class="stat-card"><div class="stat-val" style="font-size:20px">${$$(p.curr_perf)}</div><div class="stat-lbl">本期業績 ${trendBadge(p.curr_perf, p.prev_perf)}</div></div>
+        <div class="stat-card"><div class="stat-val">${p.curr_calls}</div><div class="stat-lbl">本期通次 ${trendBadge(p.curr_calls, p.prev_calls)}</div></div>
+        <div class="stat-card"><div class="stat-val">${p.curr_inv_rate > 0 ? pct(p.curr_inv_rate) : '-'}</div><div class="stat-lbl">邀約率 ${trendBadge(p.curr_inv_rate, p.prev_inv_rate)}</div></div>
+        <div class="stat-card"><div class="stat-val">${p.curr_att_rate > 0 ? pct(p.curr_att_rate) : '-'}</div><div class="stat-lbl">出席率 ${trendBadge(p.curr_att_rate, p.prev_att_rate)}</div></div>
+        <div class="stat-card"><div class="stat-val">${p.curr_conv > 0 ? pct(p.curr_conv) : '-'}</div><div class="stat-lbl">成交率 ${trendBadge(p.curr_conv, p.prev_conv)}</div></div>
+        <div class="stat-card ${p.curr_ref_amt > 0 ? 'danger' : ''}"><div class="stat-val" style="font-size:18px">${p.curr_ref_amt > 0 ? $$(p.curr_ref_amt) : '-'}</div><div class="stat-lbl">本期退費金額</div></div>
+      </div>
+    </div>
+
+    ${p.needsDiscussion ? `
+    <div class="card">
+      <div class="card-title">🚨 觸發的警示條件（共 ${p.alerts.length} 項）</div>
+      <div class="alert-list">
+        ${p.alerts.map(a => `
+          <div class="alert-item ${a.sev === 'medium' ? 'medium' : ''}">
+            <div class="alert-icon">${a.sev === 'high' ? '🔴' : '🟡'}</div>
+            <div>
+              <div class="alert-title">${a.title}</div>
+              <div class="alert-desc">${a.desc}</div>
+            </div>
+          </div>`).join('')}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-header">
+        <div class="card-title">💡 建議討論議題</div>
+        <button class="btn btn-warning btn-sm" onclick="genTopics()" id="gen-btn">
+          ✨ AI 自動生成
+        </button>
+      </div>
+      <div id="gen-status" style="display:none; text-align:center; padding:18px; color:var(--text-muted); font-size:14px">
+        <div style="display:flex; align-items:center; justify-content:center; gap:10px">
+          <div class="spinner" style="border-top-color:var(--primary); border-color:rgba(0,0,0,0.15)"></div>
+          正在呼叫 Claude AI 生成討論議題，請稍候…
+        </div>
+      </div>
+      <textarea class="topics-editor" id="topics-ta"
+        placeholder="點擊「AI 自動生成」按鈕生成議題，也可直接在此手動輸入…"
+        oninput="autoSaveTopics()">${savedTopic}</textarea>
+      <div style="font-size:12px; color:var(--text-muted); margin-top:8px">
+        ✏️ 可直接編輯上方內容；修改後自動儲存至本機
+      </div>
+    </div>
+    ` : `
+    <div class="card">
+      <div class="card-title">✅ 本期表現亮點</div>
+      ${(() => {
+        const data = period.data;
+        const avgPerf  = data.reduce((s,d)=>s+d.curr_perf,0) / (data.length||1);
+        const avgCalls = data.reduce((s,d)=>s+d.curr_calls,0) / (data.length||1);
+        const invD = data.filter(d=>d.curr_inv_rate>0);
+        const attD = data.filter(d=>d.curr_att_rate>0);
+        const cvD  = data.filter(d=>d.curr_conv>0);
+        const avgInv = invD.length ? invD.reduce((s,d)=>s+d.curr_inv_rate,0)/invD.length : 0;
+        const avgAtt = attD.length ? attD.reduce((s,d)=>s+d.curr_att_rate,0)/attD.length : 0;
+        const avgCv  = cvD.length  ? cvD.reduce((s,d)=>s+d.curr_conv,0)/cvD.length : 0;
+        const pts = [];
+        if (p.curr_perf >= avgPerf * 1.3)
+          pts.push(['🏆','業績卓越',`${$$(p.curr_perf)}，高於團隊平均 ${Math.round((p.curr_perf/avgPerf-1)*100)}%，名列前茅`]);
+        else if (p.curr_perf > avgPerf)
+          pts.push(['📈','業績高於平均',`${$$(p.curr_perf)}，優於團隊平均 ${$$(Math.round(avgPerf))}`]);
+        if (p.prev_perf > 0 && p.curr_perf >= p.prev_perf * 1.1)
+          pts.push(['🚀','業績持續成長',`較上期成長 ${Math.round((p.curr_perf/p.prev_perf-1)*100)}%，進步明顯`]);
+        if (p.curr_calls >= avgCalls * 1.2)
+          pts.push(['📞','通次積極',`本期 ${p.curr_calls} 次，高於團隊平均 ${Math.round(avgCalls)} 次`]);
+        if (p.curr_inv_rate > 0 && avgInv > 0 && p.curr_inv_rate >= avgInv * 1.2)
+          pts.push(['💌','邀約率優秀',`${pct(p.curr_inv_rate)}，高於團隊平均 ${pct(avgInv)}`]);
+        if (p.curr_att_rate > 0 && avgAtt > 0 && p.curr_att_rate >= avgAtt * 1.2)
+          pts.push(['🎯','出席率亮眼',`${pct(p.curr_att_rate)}，高於團隊平均 ${pct(avgAtt)}`]);
+        if (p.curr_conv > 0 && avgCv > 0 && p.curr_conv >= avgCv * 1.2)
+          pts.push(['💰','成交轉化率高',`${pct(p.curr_conv)}，高於團隊平均 ${pct(avgCv)}`]);
+        if (p.curr_ref_amt === 0)
+          pts.push(['😊','零退費',`本期無退費紀錄，客戶滿意度佳`]);
+        if (!pts.length)
+          return `<p style="font-size:14px; color:var(--text-muted)">本期各項指標符合預期，整體表現穩健。</p>`;
+        return `<div class="alert-list">${pts.map(([icon,title,desc])=>`
+          <div class="alert-item" style="background:#f0faf4; border-left-color:var(--success)">
+            <div class="alert-icon">${icon}</div>
+            <div><div class="alert-title">${title}</div><div class="alert-desc">${desc}</div></div>
+          </div>`).join('')}</div>`;
+      })()}
+    </div>`}
+
+    <div class="card">
+      <div class="card-title">📈 多期歷史趨勢</div>
+      <div class="charts-grid">
+        <div class="chart-wrap"><div class="chart-title">業績趨勢</div><div class="chart-container"><canvas id="ch-perf"></canvas></div></div>
+        <div class="chart-wrap"><div class="chart-title">通次趨勢</div><div class="chart-container"><canvas id="ch-calls"></canvas></div></div>
+        <div class="chart-wrap"><div class="chart-title">邀約率 (%)</div><div class="chart-container"><canvas id="ch-inv"></canvas></div></div>
+        <div class="chart-wrap"><div class="chart-title">出席率 (%)</div><div class="chart-container"><canvas id="ch-att"></canvas></div></div>
+      </div>
+    </div>`;
+
+  setTimeout(() => buildCharts(p), 80);
+}
+
+function autoSaveTopics() {
+  const val = document.getElementById('topics-ta').value;
+  const key = `${S.periodId}__${S.personKey}`;
+  const t = DB.topics();
+  t[key] = val;
+  DB.setTopics(t);
+}
+
+async function genTopics() {
+  const apiKey = DB.apiKey();
+  if (!apiKey) { toast('請先至「設定」頁面設定 Claude API Key', 'error'); return; }
+
+  const period = DB.periods().find(p => p.id === S.periodId);
+  const p = period?.data.find(d => personKey(d) === S.personKey);
+  if (!p || !p.needsDiscussion) { toast('此人員無警示條件', 'error'); return; }
+
+  const btn   = document.getElementById('gen-btn');
+  const status = document.getElementById('gen-status');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> 生成中…';
+  status.style.display = 'block';
+
+  try {
+    const alertLines = p.alerts.map(a => `• ${a.title}：${a.desc}`).join('\n');
+    const prompt = `你是一位資深銷售管理顧問，協助主管準備一對一績效面談。
+
+【業務員資訊】
+姓名：${p.name}
+組別：${p.group}
+本期業績：${$$(p.curr_perf)}（上期：${$$(p.prev_perf)}）
+本期通次：${p.curr_calls}（上期：${p.prev_calls}）
+邀約率：${pct(p.curr_inv_rate)}（上期：${pct(p.prev_inv_rate)}）
+出席率：${pct(p.curr_att_rate)}（上期：${pct(p.prev_att_rate)}）
+進件成交率：${pct(p.curr_conv)}（上期：${pct(p.prev_conv)}）
+本期退費金額：${$$(p.curr_ref_amt)}
+
+【發現的績效問題】
+${alertLines}
+
+【任務】
+請根據上述問題，生成 4～6 個具體的面談討論議題。格式要求：
+1. 每個議題以【議題名稱】開頭
+2. 說明「現象觀察」（數據現象說明）
+3. 提出「可能原因」（2～3 個假設方向）
+4. 給出「面談討論方向」（主管可直接使用的開放式問句）
+5. 語氣正向、建設性，以輔導為主，非責怪
+6. 繁體中文`;
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 2000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({}));
+      throw new Error(e.error?.message || `HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    const text = data.content[0].text;
+    document.getElementById('topics-ta').value = text;
+    autoSaveTopics();
+    toast('討論議題已生成', 'success');
+  } catch(e) {
+    console.error(e);
+    toast('生成失敗：' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '✨ AI 自動生成';
+    status.style.display = 'none';
+  }
+}
+
+/* ═══════════════════════════════════════════
+   CHARTS
+═══════════════════════════════════════════ */
+function destroyCharts() {
+  Object.values(S.charts).forEach(c => { try { c.destroy(); } catch{} });
+  S.charts = {};
+}
+
+function buildCharts(person) {
+  const allPeriods = DB.periods().sort((a,b) => a.id.localeCompare(b.id));
+  const hist = allPeriods.map(per => {
+    const found = per.data.find(d =>
+      (person.app_id && d.app_id === person.app_id) || d.name === person.name);
+    return found ? { label: per.id, d: found } : null;
+  }).filter(Boolean);
+
+  const labels = hist.map(h => h.label);
+
+  function mkChart(id, label, vals, color) {
+    const ctx = document.getElementById(id);
+    if (!ctx) return;
+    S.charts[id] = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label,
+          data: vals,
+          borderColor: color,
+          backgroundColor: color + '22',
+          fill: true,
+          tension: 0.4,
+          pointRadius: 5,
+          pointHoverRadius: 7,
+          borderWidth: 2.5
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { beginAtZero: true, grid: { color: '#f0f0f0' }, ticks: { font: { size: 11 } } },
+          x: { grid: { color: '#f0f0f0' }, ticks: { font: { size: 11 } } }
+        }
+      }
+    });
+  }
+
+  destroyCharts();
+  mkChart('ch-perf',  '業績',    hist.map(h => h.d.curr_perf),     '#1a3a5c');
+  mkChart('ch-calls', '通次',    hist.map(h => h.d.curr_calls),    '#27ae60');
+  mkChart('ch-inv',   '邀約率%', hist.map(h => h.d.curr_inv_rate), '#e67e22');
+  mkChart('ch-att',   '出席率%', hist.map(h => h.d.curr_att_rate), '#8e44ad');
+}
+
+/* ═══════════════════════════════════════════
+   SETTINGS
+═══════════════════════════════════════════ */
+function renderSettings() {
+  document.getElementById('api-key-input').value = DB.apiKey();
+  renderRulesForm();
+}
+
+function renderRulesForm() {
+  const R = DB.rules();
+  const el = document.getElementById('rules-form');
+  if (!el) return;
+
+  function row(label, id, val, unit, hint) {
+    return `
+      <div style="display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--border); flex-wrap:wrap">
+        <div style="flex:0 0 220px; font-size:14px; font-weight:600">${label}</div>
+        <div style="display:flex; align-items:center; gap:6px">
+          <input id="rule-${id}" type="number" value="${val}" min="0"
+            style="width:90px; padding:6px 10px; border:1.5px solid var(--border); border-radius:8px; font-size:14px; font-family:inherit; text-align:right">
+          <span style="font-size:13px; color:var(--text-muted)">${unit}</span>
+        </div>
+        <div style="font-size:12px; color:var(--text-muted); flex:1">${hint}</div>
+      </div>`;
+  }
+
+  el.innerHTML = `
+    <div style="background:#f4f7fb; border-radius:10px; padding:4px 16px; margin-bottom:4px">
+      ${row('R1 業績下滑', 'r1', R.r1, '%', '本期比上期下滑超過此比例才觸發')}
+      ${row('R2 連續業績為零', 'r2', '—', '', '固定規則，無法調整（本期＋上期均為 $0）')}
+      ${row('R3 邀約率下降', 'r3', R.r3, '百分點', '邀約率比上期下降超過此百分點')}
+      ${row('R4 出席率下降', 'r4', R.r4, '百分點', '出席率比上期下降超過此百分點')}
+      ${row('R5 成交率下降', 'r5', R.r5, '百分點', '成交率比上期下降超過此百分點')}
+      ${row('R6 退費金額增加', 'r6', R.r6, '%', '退費金額比上期增加超過此比例')}
+      ${row('R7 低於團隊均值', 'r7', R.r7, '% 以下', '業績低於全體平均的此比例才觸發（如填40，表示低於均值40%觸發）')}
+      ${row('R8 預估整月目標', 'r8', R.r8, '元', '推算整月業績低於此金額才觸發')}
+      ${row('R9 邀約率門檻', 'r9inv', R.r9inv, '%', 'R9 雙低：邀約率低於此值')}
+      ${row('R9 出席率門檻', 'r9att', R.r9att, '%', 'R9 雙低：出席率同時低於此值（兩項都低才觸發）')}
+      ${row('通次最低門檻', 'callsMin', R.callsMin, '次', '通次低於此值的人員直接排除，不進入分析')}
+    </div>`;
+
+  // R2 不可編輯
+  const r2input = document.getElementById('rule-r2');
+  if (r2input) { r2input.disabled = true; r2input.style.background = '#f0f0f0'; }
+}
+
+function saveRules() {
+  const fields = ['r1','r3','r4','r5','r6','r7','r8','r9inv','r9att','callsMin'];
+  const R = DB.rules();
+  fields.forEach(f => {
+    const el = document.getElementById('rule-' + f);
+    if (el) R[f] = parseFloat(el.value) || 0;
+  });
+  DB.setRules(R);
+  recalcAlerts();
+  // 即時重新整理目前所在的頁面
+  if (S.view === 'overview') renderOverview();
+  if (S.view === 'groups')   renderGroups();
+  const note = document.getElementById('rules-saved-note');
+  if (note) { note.style.display = 'inline'; setTimeout(() => note.style.display = 'none', 3000); }
+  toast('規則已套用，所有期別重新計算完成', 'success');
+}
+
+function resetRules() {
+  if (!confirm('確定要恢復所有規則為預設值嗎？')) return;
+  localStorage.removeItem('sp_rules');
+  _fs.collection('shared').doc('rules').delete().catch(()=>{});
+  recalcAlerts();
+  renderSettings();
+  if (S.view === 'overview') renderOverview();
+  if (S.view === 'groups')   renderGroups();
+  toast('已恢復預設規則並重新計算', 'success');
+}
+function toggleApiVis() {
+  const el = document.getElementById('api-key-input');
+  el.type = el.type === 'password' ? 'text' : 'password';
+}
+function saveApiKey() {
+  DB.setApi(document.getElementById('api-key-input').value.trim());
+  toast('API Key 已儲存', 'success');
+}
+function clearData() {
+  if (!confirm('確定要清除所有業績資料嗎？此操作無法還原。')) return;
+  localStorage.removeItem('sp_periods');
+  localStorage.removeItem('sp_topics');
+  S.periodId = null;
+  updateNavPeriod();
+  toast('已清除所有資料', 'success');
+}
+
+/* ═══════════════════════════════════════════
+   EXPORT: EXCEL
+═══════════════════════════════════════════ */
+function exportExcel() {
+  const period = DB.periods().find(p => p.id === S.periodId);
+  if (!period) { toast('請先選擇期別', 'error'); return; }
+  const topics = DB.topics();
+  const flagged = period.data.filter(p => p.needsDiscussion);
+
+  // Sheet1: all people
+  const s1 = period.data.map(p => ({
+    '姓名': p.name,
+    '組別': p.group,
+    '本期業績': p.curr_perf,
+    '上期業績': p.prev_perf,
+    '本期通次': p.curr_calls,
+    '本期邀約率(%)': p.curr_inv_rate,
+    '本期出席率(%)': p.curr_att_rate,
+    '本期進件成交率(%)': p.curr_conv,
+    '本期退費金額': p.curr_ref_amt,
+    '需要談談': p.needsDiscussion ? '是' : '否',
+    '警示數': p.alerts.length,
+    '警示摘要': p.alerts.map(a => a.title).join('、')
+  }));
+
+  // Sheet2: flagged + topics
+  const s2 = flagged.map(p => {
+    const k = `${S.periodId}__${personKey(p)}`;
+    return {
+      '姓名': p.name,
+      '組別': p.group,
+      '本期業績': p.curr_perf,
+      '警示說明': p.alerts.map(a => a.desc).join('\n'),
+      '討論議題': topics[k] || '（尚未生成）'
+    };
+  });
+
+  const wb = XLSX.utils.book_new();
+  const ws1 = XLSX.utils.json_to_sheet(s1);
+  const ws2 = XLSX.utils.json_to_sheet(s2);
+  ws1['!cols'] = [18,14,14,14,10,12,12,14,14,10,8,50].map(w=>({wch:w}));
+  ws2['!cols'] = [18,14,14,50,80].map(w=>({wch:w}));
+  XLSX.utils.book_append_sheet(wb, ws1, '全體人員');
+  XLSX.utils.book_append_sheet(wb, ws2, '需要談談名單');
+  XLSX.writeFile(wb, `業績分析_${period.name}_需要談談名單.xlsx`);
+  toast('Excel 已匯出', 'success');
+}
+
+/* ═══════════════════════════════════════════
+   EXPORT: PDF (print)
+═══════════════════════════════════════════ */
+function exportPDF() {
+  const period = DB.periods().find(p => p.id === S.periodId);
+  if (!period) { toast('請先選擇期別', 'error'); return; }
+  const topics = DB.topics();
+  const flagged = period.data.filter(p => p.needsDiscussion);
+
+  const html = `<!DOCTYPE html>
+<html lang="zh-TW"><head><meta charset="UTF-8">
+<title>需要談談名單 ${period.name}</title>
+<style>
+  body{font-family:'Microsoft JhengHei',sans-serif;color:#222;margin:24px;font-size:13px}
+  h1{color:#1a3a5c;border-bottom:3px solid #1a3a5c;padding-bottom:8px;margin-bottom:14px}
+  .summary{background:#f0f4f8;padding:12px 16px;border-radius:6px;margin-bottom:18px;font-size:13px}
+  .person{border:1px solid #ccc;border-radius:8px;padding:16px;margin-bottom:16px;break-inside:avoid}
+  .pname{font-size:16px;font-weight:700}.pgrp{color:#666;font-size:12px}
+  .metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}
+  .m{background:#f8f9fa;border:1px solid #e0e0e0;padding:8px;border-radius:4px;text-align:center}
+  .mv{font-size:16px;font-weight:700;color:#1a3a5c}.ml{font-size:11px;color:#888}
+  .alert{background:#fff6f6;border-left:4px solid #e74c3c;padding:7px 12px;margin:4px 0;font-size:12px;border-radius:0 5px 5px 0}
+  .alert.med{background:#fffcf0;border-left-color:#f39c12}
+  .topics{background:#f8f9fa;border:1px solid #ddd;padding:12px;border-radius:5px;white-space:pre-wrap;font-size:12px;line-height:1.7;margin-top:8px}
+  h3{font-size:14px;margin:12px 0 6px}
+  @media print{body{margin:10px}.person{page-break-inside:avoid}}
+</style></head><body>
+<h1>📊 業績分析報告 — ${period.name}</h1>
+<div class="summary">
+  <strong>總人數：</strong>${period.data.length} 人 &nbsp;│&nbsp;
+  <strong>需要談談：</strong>${flagged.length} 人 &nbsp;│&nbsp;
+  <strong>平均業績：</strong>${$$(period.stats.avgPerf)} &nbsp;│&nbsp;
+  <strong>平均通次：</strong>${Math.round(period.stats.avgCalls)} 次 &nbsp;│&nbsp;
+  <strong>列印日期：</strong>${new Date().toLocaleDateString('zh-TW')}
+</div>
+<h2 style="color:#c0392b; margin-bottom:14px">需要談談名單（共 ${flagged.length} 人）</h2>
+${flagged.map(p => {
+  const k = `${S.periodId}__${personKey(p)}`;
+  return `<div class="person">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start">
+    <div><span class="pname">${p.name}</span> <span class="pgrp">| ${p.group}</span></div>
+    <div style="color:#c0392b;font-weight:700;font-size:13px">⚠ ${p.alerts.length} 項警示</div>
+  </div>
+  <div class="metrics">
+    <div class="m"><div class="mv">${$$(p.curr_perf)}</div><div class="ml">本期業績</div></div>
+    <div class="m"><div class="mv">${p.curr_calls}</div><div class="ml">通次</div></div>
+    <div class="m"><div class="mv">${p.curr_inv_rate>0?pct(p.curr_inv_rate):'-'}</div><div class="ml">邀約率</div></div>
+    <div class="m"><div class="mv">${p.curr_att_rate>0?pct(p.curr_att_rate):'-'}</div><div class="ml">出席率</div></div>
+    <div class="m"><div class="mv">${p.curr_conv>0?pct(p.curr_conv):'-'}</div><div class="ml">成交率</div></div>
+    <div class="m"><div class="mv">${p.curr_ref_amt>0?$$(p.curr_ref_amt):'-'}</div><div class="ml">退費金額</div></div>
+  </div>
+  <h3>警示說明：</h3>
+  ${p.alerts.map(a=>`<div class="alert ${a.sev==='medium'?'med':''}">
+    ${a.sev==='high'?'🔴':'🟡'} <strong>${a.title}</strong>：${a.desc}</div>`).join('')}
+  <h3>建議討論議題：</h3>
+  <div class="topics">${(topics[k]||'（尚未生成討論議題）').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+</div>`;}).join('')}
+</body></html>`;
+
+  const w = window.open('', '_blank');
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+  setTimeout(() => w.print(), 500);
+}
+
+/* ═══════════════════════════════════════════
+   TOAST
+═══════════════════════════════════════════ */
+let _toastTimer;
+function toast(msg, type='') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show ' + type;
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => { el.className = ''; }, 3200);
+}
+
+/* ═══════════════════════════════════════════
+   AUTH
+═══════════════════════════════════════════ */
+async function doSignIn() {
+  const errEl     = document.getElementById('login-error');
+  const loadingEl = document.getElementById('login-loading');
+  errEl.style.display = 'none';
+  loadingEl.style.display = 'block';
+  try {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    await _auth.signInWithPopup(provider);
+  } catch(e) {
+    loadingEl.style.display = 'none';
+    errEl.textContent = '登入失敗：' + e.message;
+    errEl.style.display = 'block';
+  }
+}
+
+function doSignOut() {
+  _auth.signOut();
+}
+
+// 監聽登入狀態變化（頁面載入 + 登入/登出都會觸發）
+_auth.onAuthStateChanged(async (user) => {
+  // 本地開發模式：跳過登入驗證
+  if (location.hostname === '127.0.0.1' || location.hostname === 'localhost') {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('nav-user').textContent   = '本地開發模式';
+    document.getElementById('nav-user').style.display = '';
+    document.getElementById('tab-logout').style.display = 'none';
+    await startApp();
+    return;
+  }
+
+  if (!user) {
+    // 未登入 → 顯示登入畫面
+    document.getElementById('login-screen').style.display = 'flex';
+    document.getElementById('nav-user').style.display   = 'none';
+    document.getElementById('tab-logout').style.display = 'none';
+    return;
+  }
+
+  // 已登入 → 檢查是否在授權名單
+  document.getElementById('login-loading').style.display = 'block';
+  const snap = await _fs.collection('allowed_users').doc(user.email).get().catch(() => null);
+  if (!snap || !snap.exists) {
+    document.getElementById('login-loading').style.display = 'none';
+    document.getElementById('login-error').textContent =
+      `${user.email} 沒有存取權限，請聯絡管理員。`;
+    document.getElementById('login-error').style.display = 'block';
+    await _auth.signOut();
+    return;
+  }
+
+  // 授權通過 → 隱藏登入畫面，啟動主程式
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('nav-user').textContent   = user.email;
+  document.getElementById('nav-user').style.display = '';
+  document.getElementById('tab-logout').style.display = '';
+  await startApp();
+});
+
+/* ═══════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════ */
+async function startApp() {
+  document.getElementById('history-list').innerHTML =
+    '<div style="text-align:center;padding:32px;color:#999">⏳ 正在從雲端載入資料…</div>';
+
+  await loadFromFirestore();
+
+  const periods = DB.periods().sort((a,b) => b.id.localeCompare(a.id));
+  if (periods.length) { S.periodId = periods[0].id; updateNavPeriod(); }
+  renderSettings();
+  showView('company'); // 預設進入全公司總覽
+}
+</script>
+</body>
+</html>
