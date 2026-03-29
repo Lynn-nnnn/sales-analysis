@@ -27,7 +27,9 @@
       "Bash(kill 24816)",
       "Bash(firebase login:list)",
       "Bash(netlify deploy:*)",
-      "Bash(netlify sites:list)"
+      "Bash(netlify sites:list)",
+      "Bash(gh auth:*)",
+      "Bash(gh repo:*)"
     ],
     "defaultMode": "bypassPermissions"
   }
