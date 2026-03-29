@@ -288,16 +288,24 @@
       flex-wrap: wrap;
       margin-bottom: 18px;
     }
-    .filter-row select {
-      padding: 8px 12px;
+    .filter-row select,
+    .section-header select {
+      padding: 9px 32px 9px 14px;
       border: 1.5px solid var(--border);
       border-radius: 8px;
       font-size: 14px;
       font-family: inherit;
-      background: #fff;
+      background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237f8c8d' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") no-repeat right 10px center;
       color: var(--text);
+      appearance: none;
+      -webkit-appearance: none;
+      cursor: pointer;
+      transition: border-color .2s, box-shadow .2s;
     }
-    .filter-row select:focus { outline: none; border-color: var(--primary); }
+    .filter-row select:hover,
+    .section-header select:hover { border-color: var(--primary-light); }
+    .filter-row select:focus,
+    .section-header select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(26,58,92,0.1); }
 
     /* ── TREND ── */
     .trend-up   { color: var(--success); font-weight: 600; font-size: 12px; }
@@ -1166,9 +1174,10 @@ function renderOverview() {
   // 若 periodId 存在但不是最新，仍尊重用戶選擇（由 period picker 控制）
 
   const period = periods.find(p => p.id === S.periodId);
-  const groups = [...new Set(period.data.map(p => p.group))].filter(g=>g).sort();
-  const allNames = [...new Set(period.data.map(p => p.name))].filter(n=>n).sort();
-  const flagged = period.data.filter(p => p.needsDiscussion);
+  const activeData = period.data.filter(p => !_isResignedNoPerf(p));
+  const groups = [...new Set(activeData.map(p => p.group))].filter(g=>g).sort();
+  const allNames = [...new Set(activeData.map(p => p.name))].filter(n=>n).sort();
+  const flagged = activeData.filter(p => p.needsDiscussion);
 
   // ── 月份進度資訊 ──
   const { dayRatio = 1, uploadDay = 0, totalDays = 0 } = period.stats;
@@ -1191,11 +1200,11 @@ function renderOverview() {
   el.innerHTML = `
     ${runwayHtml}
     <div class="stats-grid">
-      <div class="stat-card"><div class="stat-val" id="sc-total">${period.data.length}</div><div class="stat-lbl">總人數</div></div>
+      <div class="stat-card"><div class="stat-val" id="sc-total">${activeData.length}</div><div class="stat-lbl">總人數</div></div>
       <div class="stat-card danger"><div class="stat-val" id="sc-flag">${flagged.length}</div><div class="stat-lbl">需要談談</div></div>
-      <div class="stat-card success"><div class="stat-val" id="sc-ok">${period.data.length - flagged.length}</div><div class="stat-lbl">表現正常</div></div>
-      <div class="stat-card"><div class="stat-val" style="font-size:18px" id="sc-sum-perf">${$$(period.data.reduce((s,p)=>s+p.curr_perf,0))}</div><div class="stat-lbl">業績加總（當前）</div></div>
-      <div class="stat-card"><div class="stat-val" style="font-size:20px" id="sc-avg-perf">${$$(period.stats.avgPerf)}</div><div class="stat-lbl">平均業績（當前）</div></div>
+      <div class="stat-card success"><div class="stat-val" id="sc-ok">${activeData.length - flagged.length}</div><div class="stat-lbl">表現正常</div></div>
+      <div class="stat-card"><div class="stat-val" style="font-size:18px" id="sc-sum-perf">${$$(activeData.reduce((s,p)=>s+p.curr_perf,0))}</div><div class="stat-lbl">業績加總（當前）</div></div>
+      <div class="stat-card"><div class="stat-val" style="font-size:20px" id="sc-avg-perf">${$$(teamStats(activeData).avgPerf)}</div><div class="stat-lbl">平均業績（當前）</div></div>
       <div class="stat-card"><div class="stat-val" id="sc-proj-perf">${hasRunway ? $$(Math.round(period.stats.avgPerf / dayRatio)) : '-'}</div><div class="stat-lbl">平均業績（推估整月）</div></div>
       <div class="stat-card"><div class="stat-val" id="sc-avg-calls">${Math.round(period.stats.avgCalls)}</div><div class="stat-lbl">平均通次</div></div>
     </div>
@@ -1215,6 +1224,7 @@ function renderOverview() {
             <option value="" ${S.filterStatus===''?'selected':''}>全部狀態</option>
             <option value="flag" ${S.filterStatus==='flag'?'selected':''}>需要談談</option>
             <option value="ok" ${S.filterStatus==='ok'?'selected':''}>表現正常</option>
+            <option value="resigned" ${S.filterStatus==='resigned'?'selected':''}>離職（有業績）</option>
           </select>
           <input id="sel-name" type="text" list="name-list" placeholder="搜尋姓名…" value="${S.filterName}" oninput="S.filterName=this.value.trim(); refilter()" style="padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;font-family:inherit;width:110px">
           <datalist id="name-list">${allNames.map(n=>`<option value="${n}">`).join('')}</datalist>
@@ -2028,6 +2038,13 @@ function sortByCol(col) {
   refilter();
 }
 
+function _isResigned(p) {
+  return p.name && (p.name.includes('(離職)') || p.name.includes('（離職）'));
+}
+function _isResignedNoPerf(p) {
+  return _isResigned(p) && !p.curr_perf;
+}
+
 function refilter() {
   const g  = (document.getElementById('sel-group')  || {}).value  || '';
   const st = (document.getElementById('sel-status') || {}).value  || '';
@@ -2040,10 +2057,13 @@ function refilter() {
 
   // 計算篩選後的資料
   let rows = period.data;
-  if (g)             rows = rows.filter(p => p.group === g);
-  if (st === 'flag') rows = rows.filter(p => p.needsDiscussion);
-  if (st === 'ok')   rows = rows.filter(p => !p.needsDiscussion);
-  if (nm)            rows = rows.filter(p => p.name && p.name.toLowerCase().includes(nm.toLowerCase()));
+  // 預設排除離職且無業績的人（除非選了「離職（有業績）」）
+  if (st !== 'resigned') rows = rows.filter(p => !_isResignedNoPerf(p));
+  if (g)                 rows = rows.filter(p => p.group === g);
+  if (st === 'flag')     rows = rows.filter(p => p.needsDiscussion);
+  if (st === 'ok')       rows = rows.filter(p => !p.needsDiscussion);
+  if (st === 'resigned') rows = rows.filter(p => _isResigned(p) && p.curr_perf > 0);
+  if (nm)                rows = rows.filter(p => p.name && p.name.toLowerCase().includes(nm.toLowerCase()));
 
   // 更新統計卡片
   const { dayRatio = 1, totalDays = 0 } = period.stats;
@@ -2065,10 +2085,13 @@ function refilter() {
 
 function buildTable(data, gFilter, stFilter) {
   let rows = data;
-  if (gFilter)             rows = rows.filter(p => p.group === gFilter);
-  if (stFilter === 'flag') rows = rows.filter(p => p.needsDiscussion);
-  if (stFilter === 'ok')   rows = rows.filter(p => !p.needsDiscussion);
-  if (S.filterName)        rows = rows.filter(p => p.name && p.name.toLowerCase().includes(S.filterName.toLowerCase()));
+  // 預設排除離職且無業績的人
+  if (stFilter !== 'resigned') rows = rows.filter(p => !_isResignedNoPerf(p));
+  if (gFilter)                 rows = rows.filter(p => p.group === gFilter);
+  if (stFilter === 'flag')     rows = rows.filter(p => p.needsDiscussion);
+  if (stFilter === 'ok')       rows = rows.filter(p => !p.needsDiscussion);
+  if (stFilter === 'resigned') rows = rows.filter(p => _isResigned(p) && p.curr_perf > 0);
+  if (S.filterName)            rows = rows.filter(p => p.name && p.name.toLowerCase().includes(S.filterName.toLowerCase()));
   if (!rows.length) return `<div class="empty-state" style="padding:32px"><div>無符合條件的人員</div></div>`;
 
   // 排序
