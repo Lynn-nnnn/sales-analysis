@@ -1224,7 +1224,7 @@ function renderOverview() {
             <option value="" ${S.filterStatus===''?'selected':''}>全部狀態</option>
             <option value="flag" ${S.filterStatus==='flag'?'selected':''}>需要談談</option>
             <option value="ok" ${S.filterStatus==='ok'?'selected':''}>表現正常</option>
-            <option value="resigned" ${S.filterStatus==='resigned'?'selected':''}>離職（有業績）</option>
+            <option value="resigned-no-perf" ${S.filterStatus==='resigned-no-perf'?'selected':''}>離職（無業績）</option>
           </select>
           <input id="sel-name" type="text" list="name-list" placeholder="搜尋姓名…" value="${S.filterName}" oninput="S.filterName=this.value.trim(); refilter()" style="padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;font-family:inherit;width:110px">
           <datalist id="name-list">${allNames.map(n=>`<option value="${n}">`).join('')}</datalist>
@@ -2058,11 +2058,11 @@ function refilter() {
   // 計算篩選後的資料
   let rows = period.data;
   // 預設排除離職且無業績的人（除非選了「離職（有業績）」）
-  if (st !== 'resigned') rows = rows.filter(p => !_isResignedNoPerf(p));
-  if (g)                 rows = rows.filter(p => p.group === g);
-  if (st === 'flag')     rows = rows.filter(p => p.needsDiscussion);
-  if (st === 'ok')       rows = rows.filter(p => !p.needsDiscussion);
-  if (st === 'resigned') rows = rows.filter(p => _isResigned(p) && p.curr_perf > 0);
+  if (st !== 'resigned-no-perf') rows = rows.filter(p => !_isResignedNoPerf(p));
+  if (g)                        rows = rows.filter(p => p.group === g);
+  if (st === 'flag')            rows = rows.filter(p => p.needsDiscussion);
+  if (st === 'ok')              rows = rows.filter(p => !p.needsDiscussion);
+  if (st === 'resigned-no-perf') rows = rows.filter(p => _isResignedNoPerf(p));
   if (nm)                rows = rows.filter(p => p.name && p.name.toLowerCase().includes(nm.toLowerCase()));
 
   // 更新統計卡片
@@ -2086,11 +2086,11 @@ function refilter() {
 function buildTable(data, gFilter, stFilter) {
   let rows = data;
   // 預設排除離職且無業績的人
-  if (stFilter !== 'resigned') rows = rows.filter(p => !_isResignedNoPerf(p));
-  if (gFilter)                 rows = rows.filter(p => p.group === gFilter);
-  if (stFilter === 'flag')     rows = rows.filter(p => p.needsDiscussion);
-  if (stFilter === 'ok')       rows = rows.filter(p => !p.needsDiscussion);
-  if (stFilter === 'resigned') rows = rows.filter(p => _isResigned(p) && p.curr_perf > 0);
+  if (stFilter !== 'resigned-no-perf') rows = rows.filter(p => !_isResignedNoPerf(p));
+  if (gFilter)                        rows = rows.filter(p => p.group === gFilter);
+  if (stFilter === 'flag')            rows = rows.filter(p => p.needsDiscussion);
+  if (stFilter === 'ok')              rows = rows.filter(p => !p.needsDiscussion);
+  if (stFilter === 'resigned-no-perf') rows = rows.filter(p => _isResignedNoPerf(p));
   if (S.filterName)            rows = rows.filter(p => p.name && p.name.toLowerCase().includes(S.filterName.toLowerCase()));
   if (!rows.length) return `<div class="empty-state" style="padding:32px"><div>無符合條件的人員</div></div>`;
 
