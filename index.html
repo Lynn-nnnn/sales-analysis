@@ -1211,6 +1211,17 @@ firebase.initializeApp(_fbCfg);
 const _fs   = firebase.firestore();
 _auth = firebase.auth();
 
+// 若是 redirect 登入回來，抓取結果的錯誤（unauthorized-domain 等）
+_auth.getRedirectResult().catch((e) => {
+  const errEl = document.getElementById('login-error');
+  if (errEl && e && e.message) {
+    errEl.textContent = '登入失敗：' + e.message;
+    errEl.style.display = 'block';
+    const loadingEl = document.getElementById('login-loading');
+    if (loadingEl) loadingEl.style.display = 'none';
+  }
+});
+
 /* ── Firestore 同步（fire-and-forget，不影響 UI 速度） ── */
 function fsyncPeriods(arr) {
   const batch = _fs.batch();
@@ -3851,10 +3862,23 @@ async function doSignIn() {
   const loadingEl = document.getElementById('login-loading');
   errEl.style.display = 'none';
   loadingEl.style.display = 'block';
+  const provider = new firebase.auth.GoogleAuthProvider();
+  // 優先用 popup；被擋掉（含 COOP、popup-blocker、mobile）就 fallback 整頁 redirect
   try {
-    const provider = new firebase.auth.GoogleAuthProvider();
     await _auth.signInWithPopup(provider);
   } catch(e) {
+    const fallbackCodes = ['auth/popup-blocked', 'auth/popup-closed-by-user', 'auth/cancelled-popup-request', 'auth/operation-not-supported-in-this-environment'];
+    if (fallbackCodes.includes(e.code)) {
+      try {
+        await _auth.signInWithRedirect(provider);
+        return; // redirect 會離開頁面，下方不會執行
+      } catch(e2) {
+        loadingEl.style.display = 'none';
+        errEl.textContent = '登入失敗：' + e2.message;
+        errEl.style.display = 'block';
+        return;
+      }
+    }
     loadingEl.style.display = 'none';
     errEl.textContent = '登入失敗：' + e.message;
     errEl.style.display = 'block';
