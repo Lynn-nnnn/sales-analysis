@@ -895,6 +895,7 @@
     #login-screen::before {
       content: '';
       position: absolute; inset: 0;
+      pointer-events: none;
       background:
         radial-gradient(900px 600px at 18% 8%, rgba(255,247,232,0.8) 0%, transparent 60%),
         radial-gradient(700px 500px at 82% 92%, rgba(189,159,125,0.22) 0%, transparent 55%);
@@ -902,6 +903,7 @@
     #login-screen::after {
       content: '';
       position: absolute; inset: 0;
+      pointer-events: none;
       background-image:
         radial-gradient(circle, rgba(120,90,60,0.07) 1px, transparent 1px);
       background-size: 22px 22px;
@@ -920,6 +922,7 @@
                   0 2px 8px rgba(80,60,40,0.04),
                   inset 0 1px 0 rgba(255,255,255,0.9);
       position: relative;
+      z-index: 1;
       border: 1px solid rgba(255,255,255,0.6);
       animation: loginBoxIn .55s cubic-bezier(.22,1,.36,1) both;
     }
